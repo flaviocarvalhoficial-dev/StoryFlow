@@ -1,11 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Project, SequenceModule, SceneModule, Connection, PromptStyle, AspectRatio, Position } from '@/types/storyboard';
+import { Project, SequenceModule, SceneModule, Connection, PromptStyle, AspectRatio, Position, MoodBoardItem } from '@/types/storyboard';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const createDefaultProject = (): Project => ({
   id: generateId(),
   name: 'Novo Projeto',
+  description: '',
+  status: 'Ideia',
+  progress: 0,
+  tags: [],
+  checklist: [],
   createdAt: new Date(),
   updatedAt: new Date(),
   sequences: [],
@@ -13,16 +18,17 @@ const createDefaultProject = (): Project => ({
   prompts: [],
   promptCategories: [],
   canvasBg: 'light',
+  moodboard: [],
 });
 
 export function useProject() {
   const [history, setHistory] = useState(() => {
     const saved = localStorage.getItem('storyflow_projects');
-    let initialProjects: Project[] = [createDefaultProject()];
+    let initialProjects: Project[] = [];
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           initialProjects = parsed.map((p: any) => ({
             ...p,
             createdAt: new Date(p.createdAt),
@@ -113,33 +119,39 @@ export function useProject() {
   }, [currentProjectId, setProjects]);
 
   // Project management
-  const createProject = useCallback((name: string) => {
-    const newProject = { ...createDefaultProject(), name };
+  const createProject = useCallback((name: string, initialData?: Partial<Project>) => {
+    const newProject = { ...createDefaultProject(), name, ...initialData };
     setProjects(prev => [...prev, newProject]);
     setCurrentProjectId(newProject.id);
     return newProject;
-  }, []);
+  }, [setProjects]);
 
   const deleteProject = useCallback((id: string) => {
     setProjects(prev => {
       const filtered = prev.filter(p => p.id !== id);
-      if (filtered.length === 0) {
-        const defaultProject = createDefaultProject();
-        setCurrentProjectId(defaultProject.id);
-        return [defaultProject];
-      }
       if (id === currentProjectId) {
-        setCurrentProjectId(filtered[0].id);
+        setCurrentProjectId(filtered[0]?.id || '');
       }
       return filtered;
     });
-  }, [currentProjectId]);
+  }, [currentProjectId, setProjects]);
 
-  const renameProject = useCallback((id: string, name: string) => {
-    setProjects(prev => prev.map(p =>
-      p.id === id ? { ...p, name, updatedAt: new Date() } : p
-    ));
-  }, []);
+  const updateProjectMeta = useCallback((id: string, updates: Partial<Project>) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== id) return p;
+
+      let newProject = { ...p, ...updates, updatedAt: new Date() };
+
+      // Auto-calculate progress if checklist is updated
+      if (updates.checklist) {
+        const total = updates.checklist.length;
+        const completed = updates.checklist.filter(s => s.completed).length;
+        newProject.progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+      }
+
+      return newProject;
+    }));
+  }, [setProjects]);
 
   // Canvas background
   const setCanvasBg = useCallback((bg: 'light' | 'medium' | 'dark') => {
@@ -147,7 +159,7 @@ export function useProject() {
   }, [updateProject]);
 
   // Sequence management
-  const addSequence = useCallback((position: Position) => {
+  const addSequence = useCallback((position: Position, aspectRatio?: '16:9' | '9:16' | '4:3') => {
     const newSequence: SequenceModule = {
       id: generateId(),
       title: `Sequência ${currentProject.sequences.length + 1}`,
@@ -155,7 +167,7 @@ export function useProject() {
       scenes: [],
       position,
       isCollapsed: false,
-      aspectRatio: '16:9',
+      aspectRatio: aspectRatio || '16:9',
       layoutDirection: 'horizontal',
       isVisible: true,
     };
@@ -323,6 +335,57 @@ export function useProject() {
     });
   }, [currentProject.prompts, updateProject]);
 
+  const duplicateSequence = useCallback((id: string) => {
+    const sequenceToDuplicate = currentProject.sequences.find(s => s.id === id);
+    if (!sequenceToDuplicate) return;
+
+    // Create a map of old scene IDs to new scene IDs to handle subscene relationships
+    const sceneIdMap = new Map<string, string>();
+    sequenceToDuplicate.scenes.forEach(scene => {
+      sceneIdMap.set(scene.id, generateId());
+    });
+
+    const newScenes = sequenceToDuplicate.scenes.map(scene => ({
+      ...scene,
+      id: sceneIdMap.get(scene.id)!,
+      // If it has a parentId (is a subscene), map it to the new parent's ID. 
+      // If the parent isn't in this sequence (shouldn't happen for valid subscenes), keep it undefined or as is? 
+      // Assuming valid structure where subscenes adhere to parent scenes within the same sequence.
+      parentId: scene.parentId ? sceneIdMap.get(scene.parentId) : undefined,
+    }));
+
+    const newSequence: SequenceModule = {
+      ...sequenceToDuplicate,
+      id: generateId(),
+      title: `${sequenceToDuplicate.title} (Cópia)`,
+      position: {
+        x: sequenceToDuplicate.position.x + 50,
+        y: sequenceToDuplicate.position.y + 50,
+      },
+      scenes: newScenes,
+    };
+
+    updateProject({ sequences: [...currentProject.sequences, newSequence] });
+  }, [currentProject.sequences, updateProject]);
+
+  const addMoodBoardItem = useCallback((item: MoodBoardItem) => {
+    updateProject({ moodboard: [...(currentProject.moodboard || []), item] });
+  }, [currentProject.moodboard, updateProject]);
+
+  const updateMoodBoardItem = useCallback((id: string, updates: Partial<MoodBoardItem>) => {
+    updateProject({
+      moodboard: (currentProject.moodboard || []).map(item =>
+        item.id === id ? { ...item, ...updates } : item
+      )
+    });
+  }, [currentProject.moodboard, updateProject]);
+
+  const deleteMoodBoardItem = useCallback((id: string) => {
+    updateProject({
+      moodboard: (currentProject.moodboard || []).filter(item => item.id !== id)
+    });
+  }, [currentProject.moodboard, updateProject]);
+
   return {
     projects,
     currentProject,
@@ -330,11 +393,12 @@ export function useProject() {
     setCurrentProjectId,
     createProject,
     deleteProject,
-    renameProject,
+    updateProjectMeta,
     setCanvasBg,
     addSequence,
     updateSequence,
     deleteSequence,
+    duplicateSequence,
     toggleCollapseSequence,
     toggleSequenceVisibility,
     addScene,
@@ -348,6 +412,9 @@ export function useProject() {
     deletePrompt,
     addPromptCategory,
     deletePromptCategory,
+    addMoodBoardItem,
+    updateMoodBoardItem,
+    deleteMoodBoardItem,
     undo,
     redo,
     canUndo,

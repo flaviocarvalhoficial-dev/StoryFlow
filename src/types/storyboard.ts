@@ -1,4 +1,12 @@
-export type AspectRatio = '3:4' | '16:9' | '9:16';
+export type AspectRatio = '16:9' | '9:16' | '4:3';
+export type ProjectStatus = 'Ideia' | 'Planejamento' | 'Em progresso' | 'Finalizado' | 'Arquivado';
+
+export interface ChecklistStep {
+  id: string;
+  label: string;
+  completed: boolean;
+}
+
 
 export interface Position {
   x: number;
@@ -56,6 +64,23 @@ export interface Project {
   prompts: PromptStyle[];
   promptCategories: string[];
   canvasBg: 'light' | 'medium' | 'dark' | 'black' | 'dark-gray' | 'light-gray' | 'white';
+  moodboard?: MoodBoardItem[];
+  description?: string;
+  status: ProjectStatus;
+  progress: number;
+  tags: string[];
+  checklist: ChecklistStep[];
+}
+
+export interface MoodBoardItem {
+  id: string;
+  type: 'image';
+  content: string;
+  position: Position;
+  width: number;
+  height: number;
+  rotation?: number;
+  zIndex?: number;
 }
 
 export interface CanvasState {

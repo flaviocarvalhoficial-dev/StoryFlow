@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PromptLibraryView } from './PromptLibraryView';
 import { ProjectLibraryView } from './ProjectLibraryView';
+import { MoodBoardView } from './MoodBoardView';
+import { SequenceViewer } from './SequenceViewer';
 import { PromptStyle } from '@/types/storyboard';
 import {
   Dialog,
@@ -23,8 +25,49 @@ import { Label } from '@/components/ui/label';
 
 export function StoryboardApp() {
   const [isDark, setIsDark] = useState(false);
-  const [currentView, setCurrentView] = useState<'canvas' | 'prompts' | 'projects'>('canvas');
+  const [currentView, setCurrentView] = useState<'canvas' | 'prompts' | 'projects' | 'moodboard'>(() => {
+    const saved = localStorage.getItem('storyflow_projects');
+    if (!saved || JSON.parse(saved).length === 0) return 'projects';
+    return 'canvas';
+  });
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
+
+  // Interface Settings State
+  const [sidebarFontSize, setSidebarFontSize] = useState<'01' | '02' | '03'>(() => {
+    const saved = localStorage.getItem('storyflow.sidebarFontSize');
+    return (saved as any) || '02';
+  });
+
+  const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'none'>(() => {
+    const saved = localStorage.getItem('storyflow.gridStyle');
+    return (saved as any) || 'dots';
+  });
+
+  const [connectionStyle, setConnectionStyle] = useState<'smooth' | 'straight'>(() => {
+    const saved = localStorage.getItem('storyflow.connectionStyle');
+    return (saved as any) || 'smooth';
+  });
+
+  const [defaultRatio, setDefaultRatio] = useState<'16:9' | '9:16' | '4:3'>(() => {
+    const saved = localStorage.getItem('storyflow.defaultRatio');
+    return (saved as any) || '16:9';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('storyflow.sidebarFontSize', sidebarFontSize);
+  }, [sidebarFontSize]);
+
+  useEffect(() => {
+    localStorage.setItem('storyflow.gridStyle', gridStyle);
+  }, [gridStyle]);
+
+  useEffect(() => {
+    localStorage.setItem('storyflow.connectionStyle', connectionStyle);
+  }, [connectionStyle]);
+
+  useEffect(() => {
+    localStorage.setItem('storyflow.defaultRatio', defaultRatio);
+  }, [defaultRatio]);
 
   const [contextModal, setContextModal] = useState<{ isOpen: boolean; sequenceId: string | null }>({
     isOpen: false,
@@ -41,6 +84,7 @@ export function StoryboardApp() {
   });
   const [assetsWindow, setAssetsWindow] = useState(false);
   const [referencesWindow, setReferencesWindow] = useState(false);
+  const [viewerSequenceId, setViewerSequenceId] = useState<string | null>(null);
 
   const {
     projects,
@@ -49,11 +93,12 @@ export function StoryboardApp() {
     setCurrentProjectId,
     createProject,
     deleteProject,
-    renameProject,
+    updateProjectMeta,
     setCanvasBg,
     addSequence,
     updateSequence,
     deleteSequence,
+    duplicateSequence,
     toggleCollapseSequence,
     addScene,
     updateScene,
@@ -70,8 +115,17 @@ export function StoryboardApp() {
     undo,
     redo,
     canUndo,
-    canRedo
+    canRedo,
+    addMoodBoardItem,
+    updateMoodBoardItem,
+    deleteMoodBoardItem
   } = useProject();
+
+  useEffect(() => {
+    if (projects.length === 0 && currentView !== 'projects') {
+      setCurrentView('projects');
+    }
+  }, [projects.length, currentView]);
 
   const [promptDialogOpen, setPromptDialogOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<PromptStyle | null>(null);
@@ -182,18 +236,19 @@ export function StoryboardApp() {
         onSelectProject={setCurrentProjectId}
         onCreateProject={createProject}
         onDeleteProject={deleteProject}
-        onRenameProject={renameProject}
+        onUpdateProject={updateProjectMeta}
         onSetCanvasBg={setCanvasBg}
         onAddPrompt={addPrompt}
         onUpdatePrompt={updatePrompt}
         onDeletePrompt={deletePrompt}
         onAddSequence={handleAddSequenceFromSidebar}
         onDeleteSequence={deleteSequence}
+        onDuplicateSequence={duplicateSequence}
         onUpdateSequence={updateSequence}
         onUpdateScene={updateScene}
         isDark={isDark}
         onToggleTheme={() => setIsDark(!isDark)}
-        onOpenAssets={() => setAssetsWindow(true)}
+        onOpenAssets={() => setCurrentView('moodboard')}
         onOpenReferences={() => setReferencesWindow(true)}
         promptCategories={currentProject.promptCategories || []}
         onAddPromptCategory={addPromptCategory}
@@ -204,6 +259,14 @@ export function StoryboardApp() {
         activeCategory={activeCategory}
         onToggleSequenceVisibility={toggleSequenceVisibility}
         onToggleSceneVisibility={toggleSceneVisibility}
+        fontSize={sidebarFontSize}
+        onFontSizeChange={setSidebarFontSize}
+        gridStyle={gridStyle}
+        onGridStyleChange={setGridStyle}
+        connectionStyle={connectionStyle}
+        onConnectionStyleChange={setConnectionStyle}
+        defaultRatio={defaultRatio}
+        onDefaultRatioChange={setDefaultRatio}
       />
 
       {/* Main Content Area */}
@@ -227,6 +290,10 @@ export function StoryboardApp() {
           canUndo={canUndo}
           canRedo={canRedo}
           onAddSubscene={handleAddSubscene}
+          onOpenViewer={setViewerSequenceId}
+          gridStyle={gridStyle}
+          connectionStyle={connectionStyle}
+          defaultRatio={defaultRatio}
         />
       ) : currentView === 'prompts' ? (
         <PromptLibraryView
@@ -243,7 +310,7 @@ export function StoryboardApp() {
           onUpdatePrompt={updatePrompt}
           onDeletePrompt={deletePrompt}
         />
-      ) : (
+      ) : currentView === 'projects' ? (
         <ProjectLibraryView
           projects={projects}
           onSelectProject={(id) => {
@@ -252,7 +319,14 @@ export function StoryboardApp() {
           }}
           onCreateProject={createProject}
           onDeleteProject={deleteProject}
-          onRenameProject={renameProject}
+          onUpdateProject={updateProjectMeta}
+        />
+      ) : (
+        <MoodBoardView
+          items={currentProject.moodboard || []}
+          onAddItem={addMoodBoardItem}
+          onUpdateItem={updateMoodBoardItem}
+          onDeleteItem={deleteMoodBoardItem}
         />
       )}
 
@@ -371,6 +445,13 @@ export function StoryboardApp() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Sequence Viewer Integration */}
+      <SequenceViewer
+        sequence={viewerSequenceId ? currentProject.sequences.find(s => s.id === viewerSequenceId) || null : null}
+        isOpen={!!viewerSequenceId}
+        onClose={() => setViewerSequenceId(null)}
+      />
     </div>
   );
 }

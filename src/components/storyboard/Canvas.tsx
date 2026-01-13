@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 interface CanvasProps {
   project: Project;
-  onAddSequence: (position: Position) => void;
+  onAddSequence: (position: Position, aspectRatio?: '16:9' | '9:16' | '4:3') => void;
   onUpdateSequence: (id: string, updates: Partial<SequenceType>, saveHistory?: boolean) => void;
   onDeleteSequence: (id: string) => void;
   onToggleCollapseSequence: (id: string) => void;
@@ -26,6 +26,10 @@ interface CanvasProps {
   canUndo: boolean;
   canRedo: boolean;
   onAddSubscene: (sequenceId: string, sceneId: string) => void;
+  onOpenViewer: (sequenceId: string) => void;
+  gridStyle: 'dots' | 'lines' | 'none';
+  connectionStyle: 'smooth' | 'straight';
+  defaultRatio: '16:9' | '9:16' | '4:3';
 }
 
 export function Canvas({
@@ -46,7 +50,11 @@ export function Canvas({
   onRedo,
   canUndo,
   canRedo,
-  onAddSubscene
+  onAddSubscene,
+  onOpenViewer,
+  gridStyle,
+  connectionStyle,
+  defaultRatio
 }: CanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -70,33 +78,10 @@ export function Canvas({
     const wheelHandler = (e: WheelEvent) => handleWheel(e);
     canvas.addEventListener('wheel', wheelHandler, { passive: false });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isZ = e.key.toLowerCase() === 'z';
-      const isY = e.key.toLowerCase() === 'y';
-      const isCtrl = e.ctrlKey || e.metaKey;
-      const isShift = e.shiftKey;
-
-      if (isCtrl && isZ) {
-        if (isShift) {
-          e.preventDefault();
-          if (canRedo) onRedo();
-        } else {
-          e.preventDefault();
-          if (canUndo) onUndo();
-        }
-      } else if (isCtrl && isY) {
-        e.preventDefault();
-        if (canRedo) onRedo();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
     return () => {
       canvas.removeEventListener('wheel', wheelHandler);
-      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleWheel, onUndo, onRedo, canUndo, canRedo]);
+  }, [handleWheel]);
 
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.module')) return;
@@ -113,7 +98,7 @@ export function Canvas({
   };
 
   const handleAddSequence = () => {
-    onAddSequence(addPosition);
+    onAddSequence(addPosition, defaultRatio);
     setShowAddButton(false);
   };
 
@@ -135,7 +120,7 @@ export function Canvas({
       case 'dark-gray': return '#1a1a1a';
       case 'light-gray': return '#cccccc';
       case 'white': return '#ffffff';
-      case 'medium': return 'var(--background-canvas)'; // Fallback to theme variable
+      case 'medium': return 'var(--background-canvas)';
       case 'dark': return 'var(--background-canvas)';
       case 'light':
       default: return 'var(--background-canvas)';
@@ -146,38 +131,31 @@ export function Canvas({
     switch (project.canvasBg) {
       case 'white':
       case 'light-gray':
-      case 'light':
-        return 'rgba(0,0,0,0.1)';
+      case 'light': return 'rgba(0,0,0,0.1)';
       case 'black':
       case 'dark-gray':
       case 'dark':
-      case 'medium':
-        return 'rgba(255,255,255,0.1)';
-      default:
-        return 'rgba(0,0,0,0.1)';
+      case 'medium': return 'rgba(255,255,255,0.1)';
+      default: return 'rgba(0,0,0,0.1)';
     }
   };
 
   const [guides, setGuides] = useState<{ x: number | null, y: number | null }>({ x: null, y: null });
 
   const handleSequenceDrag = (id: string, newPos: Position) => {
+    // Snap to grid or other sequences (simple implementation)
     const SNAP_THRESHOLD = 8;
     let snappedX = newPos.x;
     let snappedY = newPos.y;
     let guideX: number | null = null;
     let guideY: number | null = null;
 
-    // Compare with all other sequences
     project.sequences.forEach(other => {
       if (other.id === id) return;
-
-      // Vertical alignment (X)
       if (Math.abs(newPos.x - other.position.x) < SNAP_THRESHOLD) {
         snappedX = other.position.x;
         guideX = snappedX;
       }
-
-      // Horizontal alignment (Y)
       if (Math.abs(newPos.y - other.position.y) < SNAP_THRESHOLD) {
         snappedY = other.position.y;
         guideY = snappedY;
@@ -220,7 +198,7 @@ export function Canvas({
           className={cn("h-8 w-8", !canUndo && "opacity-30 cursor-not-allowed")}
           onClick={() => canUndo && onUndo()}
           disabled={!canUndo}
-          title="Desfazer (Ctrl+Z)"
+          title="Desfazer"
         >
           <Undo2 className="w-4 h-4" />
         </Button>
@@ -230,7 +208,7 @@ export function Canvas({
           className={cn("h-8 w-8", !canRedo && "opacity-30 cursor-not-allowed")}
           onClick={() => canRedo && onRedo()}
           disabled={!canRedo}
-          title="Refazer (Ctrl+Y)"
+          title="Refazer"
         >
           <Redo2 className="w-4 h-4" />
         </Button>
@@ -246,7 +224,7 @@ export function Canvas({
             onAddSequence({
               x: (rect.width / 2 - canvasState.panOffset.x) / canvasState.zoom - 140,
               y: (rect.height / 2 - canvasState.panOffset.y) / canvasState.zoom - 100,
-            });
+            }, defaultRatio);
           }}
         >
           <Plus className="w-4 h-4" />
@@ -287,11 +265,6 @@ export function Canvas({
         </Button>
       </div>
 
-      {/* Canvas hint */}
-      <div className="absolute bottom-4 right-4 z-10 text-xs text-muted-foreground bg-card/60 backdrop-blur-sm px-2 py-1 rounded border border-border">
-        Alt + Scroll para zoom • Shift + Drag para mover • Duplo clique para adicionar
-      </div>
-
       {/* Main canvas area */}
       <div
         ref={canvasRef}
@@ -301,7 +274,12 @@ export function Canvas({
         style={{
           cursor: showAddButton ? 'crosshair' : 'grab',
           backgroundColor: getCanvasBg(),
-          '--canvas-dot': getCanvasDotColor(),
+          backgroundImage: gridStyle === 'none' ? 'none' :
+            gridStyle === 'dots'
+              ? `radial-gradient(${getCanvasDotColor()} 1px, transparent 1px)`
+              : `linear-gradient(to right, ${getCanvasDotColor().replace('0.1', '0.05')} 1px, transparent 1px), linear-gradient(to bottom, ${getCanvasDotColor().replace('0.1', '0.05')} 1px, transparent 1px)`,
+          backgroundSize: '40px 40px',
+          backgroundPosition: `${canvasState.panOffset.x}px ${canvasState.panOffset.y}px`,
         } as any}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -330,7 +308,7 @@ export function Canvas({
             }}
           >
             <ConnectionDefs />
-            {project.connections.map(conn => {
+            {(project.connections || []).map(conn => {
               const fromSequence = project.sequences.find(s => s.id === conn.fromId || s.scenes.some(sc => sc.id === conn.fromId));
               const toSequence = project.sequences.find(s => s.id === conn.toId || s.scenes.some(sc => sc.id === conn.toId));
 
@@ -339,14 +317,13 @@ export function Canvas({
               const getPos = (seq: any, id: string, type: string) => {
                 if (type === 'sequence') {
                   return {
-                    x: seq.position.x + 200, // Right edge of header
-                    y: seq.position.y + 25   // Mid header
+                    x: seq.position.x + 200,
+                    y: seq.position.y + 25
                   };
                 }
                 const sceneIdx = seq.scenes.findIndex((s: any) => s.id === id);
                 if (sceneIdx === -1) return seq.position;
 
-                // Approximate position inside the flex layout
                 if (seq.layoutDirection === 'horizontal') {
                   const x = seq.position.x + 200 + 40 + (sceneIdx * (220 + 32)) + 110;
                   const y = seq.position.y + 100;
@@ -367,13 +344,14 @@ export function Canvas({
                   connection={conn}
                   fromPos={fromPos}
                   toPos={toPos}
+                  connectionStyle={connectionStyle}
                 />
               );
             })}
           </svg>
 
           {/* Sequence modules */}
-          {project.sequences.filter(s => s.isVisible !== false).map(sequence => (
+          {(project.sequences || []).filter(s => s.isVisible !== false).map(sequence => (
             <SequenceModule
               key={sequence.id}
               sequence={sequence}
@@ -395,6 +373,7 @@ export function Canvas({
               onOpenNotes={(sceneId) => onOpenNotes(sequence.id, sceneId)}
               onToggleSceneVisibility={(sceneId) => onToggleSceneVisibility(sequence.id, sceneId)}
               onAddSubscene={(sceneId) => onAddSubscene(sequence.id, sceneId)}
+              onOpenViewer={() => onOpenViewer(sequence.id)}
             />
           ))}
 

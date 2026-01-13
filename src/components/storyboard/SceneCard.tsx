@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
-import { Trash2, StickyNote, ImageIcon, GripVertical } from 'lucide-react';
+import { Trash2, StickyNote, ImageIcon, GripVertical, Maximize2 } from 'lucide-react';
 import { SceneModule, AspectRatio } from '@/types/storyboard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SceneCardProps {
   scene: SceneModule;
@@ -14,7 +20,7 @@ interface SceneCardProps {
 }
 
 const aspectRatioClasses: Record<AspectRatio, string> = {
-  '3:4': 'aspect-[3/4]',
+  '4:3': 'aspect-[3/4]',
   '16:9': 'aspect-video',
   '9:16': 'aspect-[9/16]',
 };
@@ -30,6 +36,7 @@ export function SceneCard({
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,8 +68,18 @@ export function SceneCard({
     e.preventDefault();
     setIsDragging(false);
 
+    // 1. Check for files (external drop)
     const file = e.dataTransfer.files?.[0];
-    if (file) handleImageUpload(file);
+    if (file) {
+      handleImageUpload(file);
+      return;
+    }
+
+    // 2. Check for internal data transfer (drag between cards)
+    const imageUrl = e.dataTransfer.getData('text/plain');
+    if (imageUrl && (imageUrl.startsWith('data:image') || imageUrl.startsWith('http') || imageUrl.startsWith('blob:') || imageUrl.length > 50)) {
+      onUpdate({ imageUrl });
+    }
   };
 
   return (
@@ -123,7 +140,7 @@ export function SceneCard({
       <div
         className={cn(
           'relative bg-muted flex items-center justify-center w-full cursor-pointer transition-colors',
-          aspectRatioClasses[aspectRatio],
+          aspectRatioClasses[aspectRatio] || 'aspect-video',
           isDragging && "bg-primary/20 border-2 border-dashed border-primary"
         )}
         onClick={() => fileInputRef.current?.click()}
@@ -140,11 +157,48 @@ export function SceneCard({
         />
 
         {scene.imageUrl ? (
-          <img
-            src={scene.imageUrl}
-            alt={scene.title}
-            className="w-full h-full object-cover"
-          />
+          <>
+            <img
+              src={scene.imageUrl}
+              alt={scene.title}
+              className="w-full h-full object-cover cursor-grab active:cursor-grabbing"
+              draggable="true"
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', scene.imageUrl || '');
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+            />
+
+            {/* Action Overlay for existing image */}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white/20 border-white/20 backdrop-blur-sm pointer-events-auto"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPreviewOpen(true);
+                }}
+                title="Visualizar tamanho real"
+              >
+                <Maximize2 className="w-4 h-4 text-white" />
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white/20 border-white/20 backdrop-blur-sm pointer-events-auto"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                title="Trocar imagem"
+              >
+                <ImageIcon className="w-4 h-4 text-white" />
+              </Button>
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
             <ImageIcon className="w-8 h-8" />
@@ -154,6 +208,23 @@ export function SceneCard({
           </div>
         )}
       </div>
+
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-[90vw] md:max-w-5xl p-0 overflow-hidden bg-black/95 border-none">
+          <DialogHeader className="p-4 absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+            <DialogTitle className="text-white font-medium">{scene.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center w-full min-h-[40vh] max-h-[85vh]">
+            {scene.imageUrl && (
+              <img
+                src={scene.imageUrl}
+                alt={scene.title}
+                className="w-full h-full object-contain shadow-2xl"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

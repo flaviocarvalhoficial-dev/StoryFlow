@@ -17,7 +17,8 @@ import {
   ArrowDown,
   Edit2,
   Eye,
-  EyeOff
+  EyeOff,
+  Film
 } from 'lucide-react';
 import { SequenceModule as SequenceModuleType, AspectRatio, Position, SceneModule } from '@/types/storyboard';
 import { SceneCard } from './SceneCard';
@@ -49,10 +50,11 @@ interface SequenceModuleProps {
   onOpenNotes: (sceneId: string) => void;
   onToggleSceneVisibility: (sceneId: string) => void;
   onAddSubscene: (sceneId: string) => void;
+  onOpenViewer: () => void;
 }
 
 const aspectRatioIcons: Record<AspectRatio, React.ElementType> = {
-  '3:4': RectangleVertical,
+  '4:3': RectangleVertical,
   '16:9': RectangleHorizontal,
   '9:16': RectangleVertical,
 };
@@ -75,6 +77,7 @@ export function SequenceModule({
   onOpenNotes,
   onToggleSceneVisibility,
   onAddSubscene,
+  onOpenViewer,
 }: SequenceModuleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -107,10 +110,10 @@ export function SequenceModule({
     }
   };
 
-  const AspectIcon = aspectRatioIcons[sequence.aspectRatio];
+  const AspectIcon = aspectRatioIcons[sequence.aspectRatio] || RectangleHorizontal;
 
   const renderSceneWithChildren = (scene: SceneModule, isTopLevel = false, index = 0) => {
-    const subscenes = sequence.scenes.filter(s => s.parentId === scene.id && s.isVisible !== false);
+    const subscenes = (sequence.scenes || []).filter(s => s.parentId === scene.id && s.isVisible !== false);
     const isExpanded = scene.isExpanded !== false;
 
     return (
@@ -263,133 +266,154 @@ export function SequenceModule({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Sequence Header Node */}
-      <div
-        className={cn(
-          "module min-w-[200px] bg-background border-2 relative z-20 group transition-all duration-200",
-          isSelected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"
-        )}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-module-border">
-          <div className="flex items-center gap-3 flex-1">
-            <GripVertical className="w-5 h-5 text-muted-foreground cursor-grab" />
-            {isEditing ? (
-              <input
-                type="text"
-                value={sequence.title}
-                onChange={(e) => onUpdateSequence({ title: e.target.value })}
-                onBlur={() => setIsEditing(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setIsEditing(false)}
-                className="no-drag bg-transparent border-b border-foreground/20 focus:border-foreground/50 outline-none text-base font-medium flex-1"
-                autoFocus
-              />
-            ) : (
-              <span
-                className="text-base font-medium cursor-text"
-                onDoubleClick={() => setIsEditing(true)}
-              >
-                {sequence.title}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 no-drag">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-9 w-9 transition-colors",
-                sequence.isVisible === false && "text-primary"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdateSequence({ isVisible: sequence.isVisible === false ? true : false });
-              }}
-              title={sequence.isVisible !== false ? "Ocultar Sequência" : "Mostrar Sequência"}
+      {/* Wrapper to ensure vertical stacking of title and module */}
+      <div className="flex flex-col">
+        {/* Title Label - External, Above Module */}
+        <div className="mb-1.5 px-1">
+          {isEditing ? (
+            <input
+              type="text"
+              value={sequence.title}
+              onChange={(e) => onUpdateSequence({ title: e.target.value })}
+              onBlur={() => setIsEditing(false)}
+              onKeyDown={(e) => e.key === 'Enter' && setIsEditing(false)}
+              className="no-drag bg-background border border-primary rounded px-1.5 py-0.5 outline-none text-xs font-semibold shadow-sm w-full"
+              autoFocus
+            />
+          ) : (
+            <div
+              className="text-xs font-semibold cursor-text px-1.5 py-0.5 rounded bg-background/80 border border-border/50 hover:border-primary/50 transition-colors truncate shadow-sm backdrop-blur-sm"
+              onDoubleClick={() => setIsEditing(true)}
+              title={sequence.title}
             >
-              {sequence.isVisible !== false ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <AspectIcon className="w-5 h-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  <Edit2 className="w-5 h-5 mr-2" />
-                  Renomear
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onUpdateSequence({ layoutDirection: sequence.layoutDirection === 'horizontal' ? 'vertical' : 'horizontal' })}>
-                  {sequence.layoutDirection === 'horizontal' ? (
-                    <>
-                      <ArrowDown className="w-5 h-5 mr-2" />
-                      Mudar para Vertical
-                    </>
-                  ) : (
-                    <>
-                      <ArrowRight className="w-5 h-5 mr-2" />
-                      Mudar para Horizontal
-                    </>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '3:4' })}>
-                  <RectangleVertical className="w-5 h-5 mr-2" />
-                  3:4
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '16:9' })}>
-                  <RectangleHorizontal className="w-5 h-5 mr-2" />
-                  16:9
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '9:16' })}>
-                  <RectangleVertical className="w-5 h-5 mr-2 rotate-180" />
-                  9:16
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={onOpenContext}
-            >
-              <Maximize2 className="w-5 h-5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={onToggleCollapse}
-            >
-              <ChevronRight className={cn(
-                "w-5 h-5 transition-transform duration-300",
-                !sequence.isCollapsed && "rotate-90"
-              )} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-destructive hover:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
-          </div>
+              {sequence.title}
+            </div>
+          )}
         </div>
 
-        {/* Connector Port (Right/Bottom of Header) */}
-        <div className={cn(
-          "absolute w-3 h-3 bg-foreground rounded-full border-2 border-background z-30 transition-all",
-          sequence.layoutDirection === 'horizontal'
-            ? "-right-1.5 top-1/2 -translate-y-1/2"
-            : "-bottom-1 left-1/2 -translate-x-1/2"
-        )} />
+        {/* Sequence Header Node - Icons Only */}
+        <div
+          className={cn(
+            "module min-w-[140px] bg-background border-2 relative z-20 group transition-all duration-200",
+            isSelected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"
+          )}
+        >
+          <div className="flex items-center justify-between p-1.5">
+            <div className="flex items-center gap-0.5 flex-1">
+              <GripVertical className="w-3.5 h-3.5 text-muted-foreground cursor-grab" />
+            </div>
+
+            <div className="flex items-center gap-0.5 no-drag">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-6 w-6 transition-colors",
+                  sequence.isVisible === false && "text-primary"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateSequence({ isVisible: sequence.isVisible === false ? true : false });
+                }}
+                title={sequence.isVisible !== false ? "Ocultar Sequência" : "Mostrar Sequência"}
+              >
+                {sequence.isVisible !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <AspectIcon className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                    <Edit2 className="w-3.5 h-3.5 mr-2" />
+                    Renomear
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onUpdateSequence({ layoutDirection: sequence.layoutDirection === 'horizontal' ? 'vertical' : 'horizontal' })}>
+                    {sequence.layoutDirection === 'horizontal' ? (
+                      <>
+                        <ArrowDown className="w-3.5 h-3.5 mr-2" />
+                        Mudar para Vertical
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="w-3.5 h-3.5 mr-2" />
+                        Mudar para Horizontal
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '4:3' })}>
+                    <RectangleVertical className="w-3.5 h-3.5 mr-2" />
+                    4:3
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '16:9' })}>
+                    <RectangleHorizontal className="w-3.5 h-3.5 mr-2" />
+                    16:9
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '9:16' })}>
+                    <RectangleVertical className="w-3.5 h-3.5 mr-2 rotate-180" />
+                    9:16
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-primary hover:bg-primary/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenViewer();
+                }}
+                title="Visualizar Sequência (Sensação de Vídeo)"
+              >
+                <Film className="w-3.5 h-3.5" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onOpenContext}
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onToggleCollapse}
+              >
+                <ChevronRight className={cn(
+                  "w-3.5 h-3.5 transition-transform duration-300",
+                  !sequence.isCollapsed && "rotate-90"
+                )} />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Connector Port (Right/Bottom of Header) */}
+          <div className={cn(
+            "absolute w-3 h-3 bg-foreground rounded-full border-2 border-background z-30 transition-all",
+            sequence.layoutDirection === 'horizontal'
+              ? "-right-1.5 top-1/2 -translate-y-1/2"
+              : "-bottom-1 left-1/2 -translate-x-1/2"
+          )} />
+        </div>
       </div>
 
       {/* Connection Line to First Scene (Hidden when collapsed) */}
@@ -406,7 +430,7 @@ export function SequenceModule({
         // When collapsed, reduce padding/gap
         sequence.isCollapsed && "p-0 gap-0"
       )}>
-        {sequence.scenes.filter(s => !s.parentId && s.isVisible !== false).map((scene, index) => (
+        {(sequence.scenes || []).filter(s => !s.parentId && s.isVisible !== false).map((scene, index) => (
           <React.Fragment key={scene.id}>
             {/* Connector between main scenes groups */}
             {index > 0 && (

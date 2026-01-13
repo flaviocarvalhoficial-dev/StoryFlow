@@ -7,6 +7,7 @@ interface ConnectionLineProps {
   toPos: Position;
   isSelected?: boolean;
   onClick?: () => void;
+  connectionStyle?: 'smooth' | 'straight';
 }
 
 export function ConnectionLine({
@@ -15,16 +16,18 @@ export function ConnectionLine({
   toPos,
   isSelected,
   onClick,
+  connectionStyle = 'smooth',
 }: ConnectionLineProps) {
   // Calculate control points for a smooth bezier curve
-  const midX = (fromPos.x + toPos.x) / 2;
   const dx = Math.abs(toPos.x - fromPos.x);
   const controlOffset = Math.min(dx * 0.5, 100);
 
-  const path = `M ${fromPos.x} ${fromPos.y} 
-                C ${fromPos.x + controlOffset} ${fromPos.y}, 
-                  ${toPos.x - controlOffset} ${toPos.y}, 
-                  ${toPos.x} ${toPos.y}`;
+  const path = connectionStyle === 'smooth'
+    ? `M ${fromPos.x} ${fromPos.y} 
+       C ${fromPos.x + controlOffset} ${fromPos.y}, 
+         ${toPos.x - controlOffset} ${toPos.y}, 
+         ${toPos.x} ${toPos.y}`
+    : `M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`;
 
   return (
     <g onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
