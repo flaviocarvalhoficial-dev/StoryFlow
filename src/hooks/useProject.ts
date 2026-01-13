@@ -172,10 +172,15 @@ export function useProject() {
   }, [currentProject.sequences, updateProject]);
 
   const deleteSequence = useCallback((id: string) => {
+    console.log('Deletando sequência:', id);
+    console.log('Sequências antes:', currentProject.sequences.length);
+    const newSequences = currentProject.sequences.filter(s => s.id !== id);
+    const newConnections = currentProject.connections.filter(c => c.fromId !== id && c.toId !== id);
+    console.log('Sequências depois:', newSequences.length);
     updateProject({
-      sequences: currentProject.sequences.filter(s => s.id !== id),
-      connections: currentProject.connections.filter(c => c.fromId !== id && c.toId !== id),
-    });
+      sequences: newSequences,
+      connections: newConnections,
+    }, true);
   }, [currentProject.sequences, currentProject.connections, updateProject]);
 
   const toggleCollapseSequence = useCallback((id: string) => {

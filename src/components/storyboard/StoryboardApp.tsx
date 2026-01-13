@@ -188,6 +188,7 @@ export function StoryboardApp() {
         onUpdatePrompt={updatePrompt}
         onDeletePrompt={deletePrompt}
         onAddSequence={handleAddSequenceFromSidebar}
+        onDeleteSequence={deleteSequence}
         onUpdateSequence={updateSequence}
         onUpdateScene={updateScene}
         isDark={isDark}

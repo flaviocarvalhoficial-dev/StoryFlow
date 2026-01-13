@@ -74,8 +74,8 @@ export function SceneCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center gap-2 p-2 border-b border-module-border/50 bg-background/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 transition-opacity duration-200 opacity-0 group-hover:opacity-100">
-        <GripVertical className="w-3 h-3 text-muted-foreground cursor-grab" />
+      <div className="flex items-center gap-2 p-2.5 border-b border-module-border/50 bg-background/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 transition-opacity duration-200 opacity-0 group-hover:opacity-100">
+        <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
         {isEditing ? (
           <input
             type="text"
@@ -83,12 +83,12 @@ export function SceneCard({
             onChange={(e) => onUpdate({ title: e.target.value })}
             onBlur={() => setIsEditing(false)}
             onKeyDown={(e) => e.key === 'Enter' && setIsEditing(false)}
-            className="bg-transparent border-b border-foreground/20 focus:border-foreground/50 outline-none text-xs font-medium flex-1"
+            className="bg-transparent border-b border-foreground/20 focus:border-foreground/50 outline-none text-sm font-medium flex-1"
             autoFocus
           />
         ) : (
           <span
-            className="text-xs font-medium cursor-text flex-1 truncate"
+            className="text-sm font-medium cursor-text flex-1 truncate"
             onDoubleClick={() => setIsEditing(true)}
           >
             {scene.title}
@@ -99,24 +99,24 @@ export function SceneCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-8 w-8"
             onClick={onOpenNotes}
           >
-            <StickyNote className="w-3 h-3" />
+            <StickyNote className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-destructive hover:text-destructive"
+            className="h-8 w-8 text-destructive hover:text-destructive"
             onClick={onDelete}
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       {/* Title overlay when not hovering (clean view) */}
-      <div className="absolute top-2 left-2 z-0 opacity-100 group-hover:opacity-0 transition-opacity bg-black/40 text-white px-2 py-1 rounded text-[10px] pointer-events-none truncate max-w-[180px]">
+      <div className="absolute top-2 left-2 z-0 opacity-100 group-hover:opacity-0 transition-opacity bg-black/40 text-white px-2 py-1 rounded text-xs pointer-events-none truncate max-w-[180px]">
         {scene.title}
       </div>
 
@@ -148,7 +148,7 @@ export function SceneCard({
         ) : (
           <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
             <ImageIcon className="w-8 h-8" />
-            <span className="text-[10px] font-medium">
+            <span className="text-xs font-medium">
               {isDragging ? "Solte a imagem" : "Upload imagem"}
             </span>
           </div>

@@ -154,25 +154,25 @@ export function SequenceModule({
           {!sequence.isCollapsed && (
             <div className="absolute -right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover/scenewrap:opacity-100 transition-opacity z-50">
               <button
-                className="w-5 h-5 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
+                className="w-6 h-6 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAddSubscene(scene.id);
                 }}
                 title="Adicionar Sub-Cena"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-4 h-4" />
               </button>
 
               {subscenes.length > 0 && (
                 <button
-                  className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
+                  className="w-6 h-6 rounded-full bg-secondary text-secondary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
                   onClick={(e) => {
                     e.stopPropagation();
                     onUpdateScene(scene.id, { isExpanded: !isExpanded });
                   }}
                 >
-                  {!isExpanded ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {!isExpanded ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
               )}
             </div>
@@ -270,9 +270,9 @@ export function SequenceModule({
           isSelected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"
         )}
       >
-        <div className="flex items-center justify-between p-3 border-b border-module-border">
-          <div className="flex items-center gap-2 flex-1">
-            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+        <div className="flex items-center justify-between p-4 border-b border-module-border">
+          <div className="flex items-center gap-3 flex-1">
+            <GripVertical className="w-5 h-5 text-muted-foreground cursor-grab" />
             {isEditing ? (
               <input
                 type="text"
@@ -280,12 +280,12 @@ export function SequenceModule({
                 onChange={(e) => onUpdateSequence({ title: e.target.value })}
                 onBlur={() => setIsEditing(false)}
                 onKeyDown={(e) => e.key === 'Enter' && setIsEditing(false)}
-                className="no-drag bg-transparent border-b border-foreground/20 focus:border-foreground/50 outline-none text-sm font-medium flex-1"
+                className="no-drag bg-transparent border-b border-foreground/20 focus:border-foreground/50 outline-none text-base font-medium flex-1"
                 autoFocus
               />
             ) : (
               <span
-                className="text-sm font-medium cursor-text"
+                className="text-base font-medium cursor-text"
                 onDoubleClick={() => setIsEditing(true)}
               >
                 {sequence.title}
@@ -298,7 +298,7 @@ export function SequenceModule({
               variant="ghost"
               size="icon"
               className={cn(
-                "h-7 w-7 transition-colors",
+                "h-9 w-9 transition-colors",
                 sequence.isVisible === false && "text-primary"
               )}
               onClick={(e) => {
@@ -307,45 +307,45 @@ export function SequenceModule({
               }}
               title={sequence.isVisible !== false ? "Ocultar Sequência" : "Mostrar Sequência"}
             >
-              {sequence.isVisible !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              {sequence.isVisible !== false ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <AspectIcon className="w-3.5 h-3.5" />
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <AspectIcon className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  <Edit2 className="w-4 h-4 mr-2" />
+                  <Edit2 className="w-5 h-5 mr-2" />
                   Renomear
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onUpdateSequence({ layoutDirection: sequence.layoutDirection === 'horizontal' ? 'vertical' : 'horizontal' })}>
                   {sequence.layoutDirection === 'horizontal' ? (
                     <>
-                      <ArrowDown className="w-4 h-4 mr-2" />
+                      <ArrowDown className="w-5 h-5 mr-2" />
                       Mudar para Vertical
                     </>
                   ) : (
                     <>
-                      <ArrowRight className="w-4 h-4 mr-2" />
+                      <ArrowRight className="w-5 h-5 mr-2" />
                       Mudar para Horizontal
                     </>
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '3:4' })}>
-                  <RectangleVertical className="w-4 h-4 mr-2" />
+                  <RectangleVertical className="w-5 h-5 mr-2" />
                   3:4
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '16:9' })}>
-                  <RectangleHorizontal className="w-4 h-4 mr-2" />
+                  <RectangleHorizontal className="w-5 h-5 mr-2" />
                   16:9
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onUpdateSequence({ aspectRatio: '9:16' })}>
-                  <RectangleVertical className="w-4 h-4 mr-2 rotate-180" />
+                  <RectangleVertical className="w-5 h-5 mr-2 rotate-180" />
                   9:16
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -354,20 +354,20 @@ export function SequenceModule({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={onOpenContext}
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <Maximize2 className="w-5 h-5" />
             </Button>
 
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-9 w-9"
               onClick={onToggleCollapse}
             >
               <ChevronRight className={cn(
-                "w-3.5 h-3.5 transition-transform duration-300",
+                "w-5 h-5 transition-transform duration-300",
                 !sequence.isCollapsed && "rotate-90"
               )} />
             </Button>
@@ -375,10 +375,10 @@ export function SequenceModule({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
+              className="h-9 w-9 text-destructive hover:text-destructive"
               onClick={onDelete}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-5 h-5" />
             </Button>
           </div>
         </div>

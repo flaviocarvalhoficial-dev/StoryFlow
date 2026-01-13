@@ -57,6 +57,7 @@ interface SidebarProps {
   onAddPromptCategory: (category: string) => void;
   onDeletePromptCategory: (category: string) => void;
   onAddSequence: () => void;
+  onDeleteSequence: (id: string) => void;
   onUpdateSequence: (id: string, updates: Partial<SequenceModule>) => void;
   onUpdateScene: (sequenceId: string, sceneId: string, updates: Partial<SceneModule>) => void;
   isDark: boolean;
@@ -86,6 +87,7 @@ export function Sidebar({
   onAddPromptCategory,
   onDeletePromptCategory,
   onAddSequence,
+  onDeleteSequence,
   onUpdateSequence,
   onUpdateScene,
   isDark,
@@ -319,133 +321,156 @@ export function Sidebar({
                     </Button>
                   </div>
 
-                  <div className="space-y-1 relative">
-                    <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border/40" />
+                  <ScrollArea className="flex-1 max-h-[400px]">
+                    <div className="space-y-1 relative pr-3">
+                      <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border/40" />
 
-                    {currentProject.sequences?.map((sequence) => (
-                      <Collapsible key={sequence.id} defaultOpen>
-                        <div className="flex items-center group/seq relative z-10">
-                          <CollapsibleTrigger asChild>
-                            <div className={cn(
-                              "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 cursor-pointer transition-all bg-sidebar group",
-                              sequence.isVisible !== false ? "text-foreground" : "text-muted-foreground opacity-40",
-                              fs.sub
-                            )}>
-                              <ChevronRight className="w-3 h-3 mr-0.5 transition-transform duration-200 group-data-[state=open]:rotate-90 opacity-40" />
-                              <div className="w-4 h-4 flex items-center justify-center">
-                                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                              </div>
-
-                              {editingSequenceId === sequence.id ? (
-                                <input
-                                  type="text"
-                                  value={editingSequenceName}
-                                  onChange={(e) => setEditingSequenceName(e.target.value)}
-                                  onBlur={() => handleRenameSequence(sequence.id)}
-                                  onKeyDown={(e) => e.key === 'Enter' && handleRenameSequence(sequence.id)}
-                                  className={cn("flex-1 bg-transparent border-b border-primary outline-none min-w-0", fs.sub)}
-                                  autoFocus
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <span
-                                  className="truncate flex-1 font-semibold tracking-tight"
-                                  onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingSequenceId(sequence.id);
-                                    setEditingSequenceName(sequence.title);
-                                  }}
-                                >
-                                  {sequence.title}
-                                </span>
-                              )}
-                            </div>
-                          </CollapsibleTrigger>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                              "h-6 w-6 transition-opacity ml-auto",
-                              sequence.isVisible !== false ? "opacity-0 group-hover/seq:opacity-100" : "opacity-100"
-                            )}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleSequenceVisibility(sequence.id);
-                            }}
-                            title={sequence.isVisible !== false ? "Ocultar Sequência" : "Mostrar Sequência"}
-                          >
-                            {sequence.isVisible !== false ? (
-                              <Eye className="w-3.5 h-3.5" />
-                            ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-primary" />
-                            )}
-                          </Button>
-                        </div>
-
-                        <CollapsibleContent className="pl-6 pt-1 space-y-0.5">
-                          {sequence.scenes.length === 0 ? (
-                            <div className={cn("text-muted-foreground/40 px-3 py-1 italic ml-4 border-l border-border/20", fs.sub)}>Sem cenas</div>
-                          ) : (
-                            sequence.scenes.map((scene) => (
-                              <div
-                                key={scene.id}
-                                className={cn("flex items-center group/scene relative transition-colors", fs.sub)}
-                              >
-                                <div className="absolute -left-[9px] top-1/2 w-2 h-px bg-border/40" />
-                                <div className={cn(
-                                  "flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-sidebar-accent/30 cursor-pointer",
-                                  scene.isVisible !== false ? "text-foreground" : "text-muted-foreground opacity-40"
-                                )}>
-                                  <FileText className="w-3 h-3 opacity-40 group-hover/scene:opacity-100 transition-opacity" />
-                                  {editingSceneId === scene.id ? (
-                                    <input
-                                      type="text"
-                                      value={editingSceneName}
-                                      onChange={(e) => setEditingSceneName(e.target.value)}
-                                      onBlur={() => handleRenameScene(sequence.id, scene.id)}
-                                      onKeyDown={(e) => e.key === 'Enter' && handleRenameScene(sequence.id, scene.id)}
-                                      className={cn("flex-1 bg-transparent border-b border-primary outline-none min-w-0", fs.sub)}
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <span
-                                      className="truncate flex-1"
-                                      onDoubleClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingSceneId(scene.id);
-                                        setEditingSceneName(scene.title);
-                                      }}
-                                    >
-                                      {scene.title}
-                                    </span>
-                                  )}
+                      {currentProject.sequences?.map((sequence) => (
+                        <Collapsible key={sequence.id} defaultOpen>
+                          <div className="flex items-center group/seq relative z-10">
+                            <CollapsibleTrigger asChild>
+                              <div className={cn(
+                                "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 cursor-pointer transition-all bg-sidebar group",
+                                sequence.isVisible !== false ? "text-foreground" : "text-muted-foreground opacity-40",
+                                fs.sub
+                              )}>
+                                <ChevronRight className="w-3 h-3 mr-0.5 transition-transform duration-200 group-data-[state=open]:rotate-90 opacity-40" />
+                                <div className="w-4 h-4 flex items-center justify-center">
+                                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "h-6 w-6 transition-opacity ml-1",
-                                    scene.isVisible !== false ? "opacity-0 group-hover/scene:opacity-100" : "opacity-100"
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleSceneVisibility(sequence.id, scene.id);
-                                  }}
-                                  title={scene.isVisible !== false ? "Ocultar Cena" : "Mostrar Cena"}
-                                >
-                                  {scene.isVisible !== false ? (
-                                    <Eye className="w-3 h-3" />
-                                  ) : (
-                                    <EyeOff className="w-3 h-3 text-primary" />
-                                  )}
-                                </Button>
+
+                                {editingSequenceId === sequence.id ? (
+                                  <input
+                                    type="text"
+                                    value={editingSequenceName}
+                                    onChange={(e) => setEditingSequenceName(e.target.value)}
+                                    onBlur={() => handleRenameSequence(sequence.id)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleRenameSequence(sequence.id)}
+                                    className={cn("flex-1 bg-transparent border-b border-primary outline-none min-w-0", fs.sub)}
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span
+                                    className="truncate flex-1 font-semibold tracking-tight"
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingSequenceId(sequence.id);
+                                      setEditingSequenceName(sequence.title);
+                                    }}
+                                  >
+                                    {sequence.title}
+                                  </span>
+                                )}
                               </div>
-                            ))
-                          )}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    ))}
-                  </div>
+                            </CollapsibleTrigger>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-6 w-6 transition-opacity",
+                                  sequence.isVisible !== false ? "opacity-0 group-hover/seq:opacity-100" : "opacity-100"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onToggleSequenceVisibility(sequence.id);
+                                }}
+                                title={sequence.isVisible !== false ? "Ocultar Sequência" : "Mostrar Sequência"}
+                              >
+                                {sequence.isVisible !== false ? (
+                                  <Eye className="w-3.5 h-3.5" />
+                                ) : (
+                                  <EyeOff className="w-3.5 h-3.5 text-primary" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover/seq:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Botão de excluir clicado para sequência:', sequence.id, sequence.title);
+                                  console.log('Chamando onDeleteSequence diretamente');
+                                  onDeleteSequence(sequence.id);
+                                }}
+                                title="Excluir Sequência (Clique duplo para confirmar)"
+                                onDoubleClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <CollapsibleContent className="pl-6 pt-1 space-y-0.5">
+                            {sequence.scenes.length === 0 ? (
+                              <div className={cn("text-muted-foreground/40 px-3 py-1 italic ml-4 border-l border-border/20", fs.sub)}>Sem cenas</div>
+                            ) : (
+                              sequence.scenes.map((scene) => (
+                                <div
+                                  key={scene.id}
+                                  className={cn("flex items-center group/scene relative transition-colors", fs.sub)}
+                                >
+                                  <div className="absolute -left-[9px] top-1/2 w-2 h-px bg-border/40" />
+                                  <div className={cn(
+                                    "flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-sidebar-accent/30 cursor-pointer",
+                                    scene.isVisible !== false ? "text-foreground" : "text-muted-foreground opacity-40"
+                                  )}>
+                                    <FileText className="w-3 h-3 opacity-40 group-hover/scene:opacity-100 transition-opacity" />
+                                    {editingSceneId === scene.id ? (
+                                      <input
+                                        type="text"
+                                        value={editingSceneName}
+                                        onChange={(e) => setEditingSceneName(e.target.value)}
+                                        onBlur={() => handleRenameScene(sequence.id, scene.id)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleRenameScene(sequence.id, scene.id)}
+                                        className={cn("flex-1 bg-transparent border-b border-primary outline-none min-w-0", fs.sub)}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span
+                                        className="truncate flex-1"
+                                        onDoubleClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingSceneId(scene.id);
+                                          setEditingSceneName(scene.title);
+                                        }}
+                                      >
+                                        {scene.title}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      "h-6 w-6 transition-opacity ml-1",
+                                      scene.isVisible !== false ? "opacity-0 group-hover/scene:opacity-100" : "opacity-100"
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onToggleSceneVisibility(sequence.id, scene.id);
+                                    }}
+                                    title={scene.isVisible !== false ? "Ocultar Cena" : "Mostrar Cena"}
+                                  >
+                                    {scene.isVisible !== false ? (
+                                      <Eye className="w-3 h-3" />
+                                    ) : (
+                                      <EyeOff className="w-3 h-3 text-primary" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ))
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </>
               )}
             </div>
