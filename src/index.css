@@ -1,0 +1,274 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Premium Indigo Light Theme */
+    --background: 210 40% 98%;
+    --background-canvas: 210 20% 96%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 0.5rem;
+
+    /* Custom Canvas Colors */
+    --canvas-bg-light: 210 20% 96%;
+    --canvas-bg-medium: 210 20% 85%;
+    --canvas-bg-dark: 210 20% 15%;
+
+    /* Module colors */
+    --module-bg: 0 0% 100%;
+    --module-border: 214.3 31.8% 91.4%;
+    --module-hover: 210 40% 99%;
+
+    /* Sidebar */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-primary: 221.2 83.2% 53.3%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 94%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
+
+    /* Connection lines */
+    --line-color: 215.4 16.3% 60%;
+    --line-hover: 221.2 83.2% 53.3%;
+  }
+
+  .dark {
+    /* Deep Slate Dark Theme */
+    --background: 222.2 84% 4.9%;
+    --background-canvas: 222.2 84% 3.5%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 7%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 7%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+
+    /* Custom Canvas Colors */
+    --canvas-bg-light: 217.2 32.6% 15%;
+    --canvas-bg-medium: 222.2 84% 8%;
+    --canvas-bg-dark: 222.2 84% 2%;
+
+    /* Module colors */
+    --module-bg: 222.2 84% 10%;
+    --module-border: 217.2 32.6% 18%;
+    --module-hover: 222.2 84% 12%;
+
+    /* Sidebar */
+    --sidebar-background: 222.2 84% 3.5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 217.2 32.6% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 14%;
+    --sidebar-ring: 224.3 76.3% 48%;
+
+    /* Connection lines */
+    --line-color: 217.2 32.6% 35%;
+    --line-hover: 217.2 91.2% 59.8%;
+  }
+
+  /* Canvas background variants */
+  .canvas-light {
+    --background-canvas: 0 0% 94%;
+    --canvas-dot: rgba(0, 0, 0, 0.15);
+  }
+
+  .canvas-medium {
+    --background-canvas: 0 0% 75%;
+    --canvas-dot: rgba(255, 255, 255, 0.15);
+  }
+
+  .canvas-dark {
+    --background-canvas: 0 0% 12%;
+    --canvas-dot: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .canvas-light {
+    --background-canvas: 0 0% 20%;
+    --canvas-dot: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .canvas-medium {
+    --background-canvas: 0 0% 12%;
+    --canvas-dot: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .canvas-dark {
+    --background-canvas: 0 0% 6%;
+    --canvas-dot: rgba(255, 255, 255, 0.05);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+
+  /* Module styles */
+  .module {
+    @apply bg-module border border-module-border rounded-md shadow-sm transition-all duration-150;
+  }
+
+  .module:hover {
+    @apply bg-module-hover shadow-md;
+  }
+
+  .module.selected {
+    @apply ring-2 ring-ring shadow-lg;
+  }
+
+  /* Connection line */
+  .connection-line {
+    stroke: hsl(var(--line-color));
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.15s ease;
+  }
+
+  .connection-line:hover {
+    stroke: hsl(var(--line-hover));
+    stroke-width: 2.5;
+  }
+
+  /* Stacked modules effect */
+  .stacked-module {
+    @apply absolute transition-all duration-300 ease-out;
+  }
+
+  .stacked-module:nth-child(1) {
+    transform: rotate(-2deg) translateX(-4px);
+  }
+
+  .stacked-module:nth-child(2) {
+    transform: rotate(1deg) translateX(2px) translateY(2px);
+  }
+
+  .stacked-module:nth-child(3) {
+    transform: rotate(-1deg) translateX(-2px) translateY(4px);
+  }
+
+  /* Canvas grid pattern */
+  .canvas-grid {
+    background-image:
+      radial-gradient(circle, var(--canvas-dot, hsl(var(--border))) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Prompt card */
+  .prompt-card {
+    @apply relative overflow-hidden rounded-lg border border-border bg-card transition-all duration-150;
+  }
+
+  .prompt-card:hover {
+    @apply shadow-md border-muted-foreground/30;
+  }
+
+  .prompt-card:hover .copy-icon {
+    @apply opacity-100;
+  }
+
+  .copy-icon {
+    @apply opacity-0 transition-opacity duration-150;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer utilities {
+  .bg-module {
+    background-color: hsl(var(--module-bg));
+  }
+
+  .bg-module-hover {
+    background-color: hsl(var(--module-hover));
+  }
+
+  .border-module-border {
+    border-color: hsl(var(--module-border));
+  }
+
+  .bg-canvas {
+    background-color: hsl(var(--background-canvas));
+  }
+}
