@@ -10,6 +10,7 @@ interface SceneCardProps {
   onUpdate: (updates: Partial<SceneModule>) => void;
   onDelete: () => void;
   onOpenNotes: () => void;
+  isSmall?: boolean;
 }
 
 const aspectRatioClasses: Record<AspectRatio, string> = {
@@ -24,6 +25,7 @@ export function SceneCard({
   onUpdate,
   onDelete,
   onOpenNotes,
+  isSmall = false,
 }: SceneCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -65,7 +67,10 @@ export function SceneCard({
 
   return (
     <div
-      className="group relative bg-secondary/50 border border-module-border rounded-md overflow-hidden no-drag w-[220px] shadow-sm transition-all hover:shadow-md"
+      className={cn(
+        "group relative bg-secondary/50 border border-module-border rounded-md overflow-hidden no-drag shadow-sm transition-all hover:shadow-md",
+        isSmall ? "w-[160px]" : "w-[220px]"
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

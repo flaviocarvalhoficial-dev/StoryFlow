@@ -13,6 +13,8 @@ export interface SceneModule {
   position: Position;
   aspectRatio: AspectRatio;
   parentId?: string;
+  isExpanded?: boolean;
+  isSubscene?: boolean;
   isVisible?: boolean;
 }
 

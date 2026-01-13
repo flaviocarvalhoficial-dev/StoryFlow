@@ -19,7 +19,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { SequenceModule as SequenceModuleType, AspectRatio, Position } from '@/types/storyboard';
+import { SequenceModule as SequenceModuleType, AspectRatio, Position, SceneModule } from '@/types/storyboard';
 import { SceneCard } from './SceneCard';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +48,7 @@ interface SequenceModuleProps {
   onOpenContext: () => void;
   onOpenNotes: (sceneId: string) => void;
   onToggleSceneVisibility: (sceneId: string) => void;
+  onAddSubscene: (sceneId: string) => void;
 }
 
 const aspectRatioIcons: Record<AspectRatio, React.ElementType> = {
@@ -73,6 +74,7 @@ export function SequenceModule({
   onOpenContext,
   onOpenNotes,
   onToggleSceneVisibility,
+  onAddSubscene,
 }: SequenceModuleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -106,6 +108,142 @@ export function SequenceModule({
   };
 
   const AspectIcon = aspectRatioIcons[sequence.aspectRatio];
+
+  const renderSceneWithChildren = (scene: SceneModule, isTopLevel = false, index = 0) => {
+    const subscenes = sequence.scenes.filter(s => s.parentId === scene.id && s.isVisible !== false);
+    const isExpanded = scene.isExpanded !== false;
+
+    return (
+      <div
+        key={scene.id}
+        className={cn(
+          "relative group transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)] flex items-center",
+          sequence.layoutDirection === 'horizontal' ? "flex-row" : "flex-col",
+          isTopLevel && sequence.isCollapsed && (
+            sequence.layoutDirection === 'horizontal'
+              ? index === 0 ? "ml-0" : "-ml-[200px]"
+              : index === 0 ? "mt-0" : "-mt-[200px]"
+          )
+        )}
+        style={isTopLevel && sequence.isCollapsed ? {
+          transform: `
+            translateX(${sequence.layoutDirection === 'horizontal' ? index * 8 : (index % 2) * 4}px) 
+            translateY(${sequence.layoutDirection === 'horizontal' ? (index % 2) * 4 : index * 8}px) 
+            rotate(${index % 2 === 0 ? 3 + index : -2 - index}deg)
+            scale(0.95)
+          `,
+          zIndex: sequence.scenes.length - index,
+        } : {
+          zIndex: 1,
+          transform: 'none'
+        }}
+      >
+        <div className="relative group/scenewrap">
+          {/* Input Port */}
+          {(!isTopLevel || index > 0) && (
+            <div className={cn(
+              "absolute w-2 h-2 bg-border rounded-full z-30 transition-opacity duration-200",
+              sequence.layoutDirection === 'horizontal'
+                ? "-left-1 top-1/2 -translate-y-1/2"
+                : "-top-1 left-1/2 -translate-x-1/2",
+              sequence.isCollapsed ? "opacity-0" : "opacity-100"
+            )} />
+          )}
+
+          {/* Right Node to Add Subscene */}
+          {!sequence.isCollapsed && (
+            <div className="absolute -right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover/scenewrap:opacity-100 transition-opacity z-50">
+              <button
+                className="w-5 h-5 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddSubscene(scene.id);
+                }}
+                title="Adicionar Sub-Cena"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+
+              {subscenes.length > 0 && (
+                <button
+                  className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 no-drag"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateScene(scene.id, { isExpanded: !isExpanded });
+                  }}
+                >
+                  {!isExpanded ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Stack effect when collapsed */}
+          {!sequence.isCollapsed && !isExpanded && subscenes.length > 0 && (
+            <div className="absolute inset-0 z-0 pointer-events-none">
+              {subscenes.slice(0, 3).map((_, i) => (
+                <div
+                  key={`stack-${i}`}
+                  className={cn(
+                    "absolute border border-module-border/30 bg-secondary/30 rounded-md transition-all duration-300",
+                    isTopLevel ? "w-[220px]" : "w-[160px]",
+                    "aspect-video" // fallback to video if no ratio is passed? No, aspect ratio is on Sequence.
+                  )}
+                  style={{
+                    // aspect ratio from parent? No, we need to match the card height roughly.
+                    // Let's use top/left/right/bottom 0 and then offset it.
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    transform: `translateY(${(i + 1) * 6}px) translateX(${(i % 2 === 0 ? 1 : -1) * 4}px) rotate(${(i % 2 === 0 ? 1 : -1) * 2}deg)`,
+                    zIndex: -1 - i,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          <SceneCard
+            scene={scene}
+            isSmall={!isTopLevel}
+            aspectRatio={sequence.aspectRatio}
+            onUpdate={(updates) => onUpdateScene(scene.id, updates)}
+            onDelete={() => onDeleteScene(scene.id)}
+            onOpenNotes={() => onOpenNotes(scene.id)}
+          />
+
+          {/* Output Port */}
+          <div className={cn(
+            "absolute w-2 h-2 bg-foreground rounded-full border border-background z-30 transition-opacity duration-200",
+            sequence.layoutDirection === 'horizontal'
+              ? "-right-1 top-1/2 -translate-y-1/2"
+              : "-bottom-1 left-1/2 -translate-x-1/2",
+            sequence.isCollapsed ? "opacity-0" : "opacity-100"
+          )} />
+        </div>
+
+        {/* Render Subscenes Chain */}
+        {!sequence.isCollapsed && isExpanded && subscenes.length > 0 && (
+          <div className={cn(
+            "flex transition-all duration-500",
+            sequence.layoutDirection === 'horizontal' ? "flex-row" : "flex-col"
+          )}>
+            {subscenes.map((sub, sIdx) => (
+              <React.Fragment key={sub.id}>
+                {/* Connector to subscene */}
+                <div className={cn(
+                  "bg-primary/20 transition-all duration-500",
+                  sequence.layoutDirection === 'horizontal' ? "w-8 h-0.5" : "h-8 w-0.5"
+                )} />
+                {renderSceneWithChildren(sub)}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -250,7 +388,7 @@ export function SequenceModule({
           "absolute w-3 h-3 bg-foreground rounded-full border-2 border-background z-30 transition-all",
           sequence.layoutDirection === 'horizontal'
             ? "-right-1.5 top-1/2 -translate-y-1/2"
-            : "-bottom-1.5 left-1/2 -translate-x-1/2"
+            : "-bottom-1 left-1/2 -translate-x-1/2"
         )} />
       </div>
 
@@ -261,78 +399,24 @@ export function SequenceModule({
         sequence.isCollapsed ? "w-4 opacity-0" : "opacity-100"
       )} />
 
-      {/* Scenes Container */}
+      {/* Main Scenes Container */}
       <div className={cn(
         "flex items-center transition-all duration-500 ease-in-out relative",
         sequence.layoutDirection === 'horizontal' ? "flex-row" : "flex-col",
         // When collapsed, reduce padding/gap
         sequence.isCollapsed && "p-0 gap-0"
       )}>
-        {sequence.scenes.filter(s => s.isVisible !== false).map((scene, index) => (
+        {sequence.scenes.filter(s => !s.parentId && s.isVisible !== false).map((scene, index) => (
           <React.Fragment key={scene.id}>
-            {/* Connector between scenes */}
+            {/* Connector between main scenes groups */}
             {index > 0 && (
               <div className={cn(
                 "bg-border transition-all duration-500",
                 sequence.layoutDirection === 'horizontal' ? "w-8 h-0.5" : "h-8 w-0.5",
-                // When collapsed: shrink connector to 0
                 sequence.isCollapsed && "w-0 h-0 opacity-0 m-0"
               )} />
             )}
-
-            <div
-              className={cn(
-                "relative group transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
-                // Expanded: Normal flow
-                // Collapsed: Negative margins to stack them up
-                sequence.isCollapsed && (
-                  sequence.layoutDirection === 'horizontal'
-                    ? index === 0 ? "ml-0" : "-ml-[200px]"
-                    : index === 0 ? "mt-0" : "-mt-[200px]" // Vertical stacking
-                )
-              )}
-              style={sequence.isCollapsed ? {
-                transform: `
-                  translateX(${sequence.layoutDirection === 'horizontal' ? index * 8 : (index % 2) * 4}px) 
-                  translateY(${sequence.layoutDirection === 'horizontal' ? (index % 2) * 4 : index * 8}px) 
-                  rotate(${index % 2 === 0 ? 3 + index : -2 - index}deg)
-                  scale(0.95)
-                `,
-                zIndex: sequence.scenes.length - index,
-              } : {
-                zIndex: 1,
-                transform: 'none'
-              }}
-            >
-              {/* Input Port (Hidden when collapsed) */}
-              <div className={cn(
-                "absolute w-2 h-2 bg-border rounded-full z-30 transition-opacity duration-200",
-                sequence.layoutDirection === 'horizontal'
-                  ? "-left-1 top-1/2 -translate-y-1/2"
-                  : "-top-1 left-1/2 -translate-x-1/2",
-                sequence.isCollapsed ? "opacity-0" : "opacity-100"
-              )} />
-
-              {/* Scene Content */}
-              <div className={cn("transition-transform duration-500")}>
-                <SceneCard
-                  scene={scene}
-                  aspectRatio={sequence.aspectRatio}
-                  onUpdate={(updates) => onUpdateScene(scene.id, updates)}
-                  onDelete={() => onDeleteScene(scene.id)}
-                  onOpenNotes={() => onOpenNotes(scene.id)}
-                />
-              </div>
-
-              {/* Output Port (Hidden when collapsed) */}
-              <div className={cn(
-                "absolute w-2 h-2 bg-foreground rounded-full border border-background z-30 transition-opacity duration-200",
-                sequence.layoutDirection === 'horizontal'
-                  ? "-right-1 top-1/2 -translate-y-1/2"
-                  : "-bottom-1 left-1/2 -translate-x-1/2",
-                sequence.isCollapsed ? "opacity-0" : "opacity-100"
-              )} />
-            </div>
+            {renderSceneWithChildren(scene, true, index)}
           </React.Fragment>
         ))}
 
@@ -346,7 +430,7 @@ export function SequenceModule({
         {/* Add Scene Button Node (Hidden when collapsed) */}
         <div
           className={cn(
-            "group relative cursor-pointer transition-all duration-300 origin-left",
+            "group relative cursor-pointer transition-all duration-300 origin-left shrink-0",
             sequence.isCollapsed ? "scale-0 opacity-0 w-0 h-0 overflow-hidden ml-0" : "scale-100 opacity-100"
           )}
           onClick={onAddScene}

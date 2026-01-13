@@ -164,6 +164,10 @@ export function StoryboardApp() {
     setCurrentView('canvas');
   };
 
+  const handleAddSubscene = (sequenceId: string, sceneId: string) => {
+    addScene(sequenceId, { x: 0, y: 0 }, sceneId, true);
+  };
+
   const handleSwitchToCategory = (category: string) => {
     setActiveCategory(category);
     setCurrentView('prompts');
@@ -221,6 +225,7 @@ export function StoryboardApp() {
           onRedo={redo}
           canUndo={canUndo}
           canRedo={canRedo}
+          onAddSubscene={handleAddSubscene}
         />
       ) : currentView === 'prompts' ? (
         <PromptLibraryView

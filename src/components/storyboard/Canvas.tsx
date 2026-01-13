@@ -25,6 +25,7 @@ interface CanvasProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onAddSubscene: (sequenceId: string, sceneId: string) => void;
 }
 
 export function Canvas({
@@ -44,7 +45,8 @@ export function Canvas({
   onUndo,
   onRedo,
   canUndo,
-  canRedo
+  canRedo,
+  onAddSubscene
 }: CanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -328,7 +330,46 @@ export function Canvas({
             }}
           >
             <ConnectionDefs />
-            {/* Connections would be rendered here based on project.connections */}
+            {project.connections.map(conn => {
+              const fromSequence = project.sequences.find(s => s.id === conn.fromId || s.scenes.some(sc => sc.id === conn.fromId));
+              const toSequence = project.sequences.find(s => s.id === conn.toId || s.scenes.some(sc => sc.id === conn.toId));
+
+              if (!fromSequence || !toSequence) return null;
+
+              const getPos = (seq: any, id: string, type: string) => {
+                if (type === 'sequence') {
+                  return {
+                    x: seq.position.x + 200, // Right edge of header
+                    y: seq.position.y + 25   // Mid header
+                  };
+                }
+                const sceneIdx = seq.scenes.findIndex((s: any) => s.id === id);
+                if (sceneIdx === -1) return seq.position;
+
+                // Approximate position inside the flex layout
+                if (seq.layoutDirection === 'horizontal') {
+                  const x = seq.position.x + 200 + 40 + (sceneIdx * (220 + 32)) + 110;
+                  const y = seq.position.y + 100;
+                  return { x, y };
+                } else {
+                  const x = seq.position.x + 100;
+                  const y = seq.position.y + 50 + 40 + (sceneIdx * (150 + 32)) + 75;
+                  return { x, y };
+                }
+              };
+
+              const fromPos = getPos(fromSequence, conn.fromId, conn.fromType);
+              const toPos = getPos(toSequence, conn.toId, conn.toType);
+
+              return (
+                <ConnectionLine
+                  key={conn.id}
+                  connection={conn}
+                  fromPos={fromPos}
+                  toPos={toPos}
+                />
+              );
+            })}
           </svg>
 
           {/* Sequence modules */}
@@ -353,6 +394,7 @@ export function Canvas({
               onOpenContext={() => onOpenContext(sequence.id)}
               onOpenNotes={(sceneId) => onOpenNotes(sequence.id, sceneId)}
               onToggleSceneVisibility={(sceneId) => onToggleSceneVisibility(sequence.id, sceneId)}
+              onAddSubscene={(sceneId) => onAddSubscene(sequence.id, sceneId)}
             />
           ))}
 

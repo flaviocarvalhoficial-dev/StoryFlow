@@ -195,16 +195,19 @@ export function useProject() {
   }, [currentProject.sequences, updateProject]);
 
   // Scene management
-  const addScene = useCallback((sequenceId: string, position: Position) => {
+  const addScene = useCallback((sequenceId: string, position: Position, parentId?: string, isSubscene?: boolean) => {
     const sequence = currentProject.sequences.find(s => s.id === sequenceId);
     if (!sequence) return null;
 
     const newScene: SceneModule = {
       id: generateId(),
-      title: `Cena ${sequence.scenes.length + 1}`,
+      title: isSubscene ? `Sub-Cena ${sequence.scenes.filter(s => s.parentId === parentId).length + 1}` : `Cena ${sequence.scenes.filter(s => !s.parentId).length + 1}`,
       notes: '',
       position,
       aspectRatio: sequence.aspectRatio,
+      parentId,
+      isSubscene,
+      isExpanded: true,
       isVisible: true,
     };
 
