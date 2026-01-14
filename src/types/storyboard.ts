@@ -36,6 +36,7 @@ export interface SequenceModule {
   aspectRatio: AspectRatio;
   layoutDirection: 'horizontal' | 'vertical';
   isVisible?: boolean;
+  scenesSpacing?: 'normal' | 'none';
 }
 
 export interface Connection {
@@ -66,10 +67,27 @@ export interface Project {
   canvasBg: 'light' | 'medium' | 'dark' | 'black' | 'dark-gray' | 'light-gray' | 'white';
   moodboard?: MoodBoardItem[];
   description?: string;
+  script?: string;
+  scriptMode?: 'simple' | 'structured';
+  structuredScript?: ScriptScene[];
   status: ProjectStatus;
   progress: number;
-  tags: string[];
+  tags: ProjectTag[];
   checklist: ChecklistStep[];
+  coverImage?: string;
+  deadline?: Date;
+}
+
+export interface ProjectTag {
+  id: string;
+  label: string;
+  color: string;
+}
+
+export interface ScriptScene {
+  id: string;
+  content: string;
+  isCompleted: boolean;
 }
 
 export interface MoodBoardItem {

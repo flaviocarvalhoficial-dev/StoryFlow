@@ -206,11 +206,11 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
                 backgroundPosition: `${pan.x}px ${pan.y}px`
             }}
         >
-            <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur-md p-4 rounded-lg text-white/70 pointer-events-none select-none">
-                <h2 className="text-xl font-bold text-white mb-2">MoodBoard Infinito</h2>
-                <p className="text-sm">CTRL+V para colar imagens</p>
-                <p className="text-sm">Arraste para mover imagens</p>
-                <p className="text-sm">Scroll para navegar (CTRL+Scroll para zoom)</p>
+            <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur-md p-3 rounded-lg text-white/70 pointer-events-none select-none shadow-lg border border-white/5">
+                <h2 className="text-base font-semibold text-white mb-1">MoodBoard Infinito</h2>
+                <p className="text-[10px] leading-tight opacity-80">CTRL+V para colar imagens</p>
+                <p className="text-[10px] leading-tight opacity-80">Arraste para mover imagens</p>
+                <p className="text-[10px] leading-tight opacity-80">Scroll para navegar (CTRL+Scroll para zoom)</p>
             </div>
 
             <div

@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import {
     Plus,
     Search,
+    MoreHorizontal,
     MoreVertical,
     Trash2,
     ExternalLink,
-    Calendar,
+    Calendar as CalendarIcon,
     Tag,
+    ChevronLeft,
     ChevronRight,
     Circle,
     CheckCircle2,
@@ -18,9 +20,14 @@ import {
     FileText,
     ListTodo,
     X,
-    GripVertical
+    GripVertical,
+
+    Edit,
+    Image as ImageIcon,
+    Upload
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
     DropdownMenu,
@@ -55,7 +62,33 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+    CommandSeparator,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { ptBR } from 'date-fns/locale';
+
+const TAG_COLORS = [
+    { name: 'Cinza', value: 'bg-slate-100 text-slate-700 border-slate-200' },
+    { name: 'Vermelho', value: 'bg-red-100 text-red-700 border-red-200' },
+    { name: 'Laranja', value: 'bg-orange-100 text-orange-700 border-orange-200' },
+    { name: 'Amarelo', value: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+    { name: 'Verde', value: 'bg-green-100 text-green-700 border-green-200' },
+    { name: 'Azul', value: 'bg-blue-100 text-blue-700 border-blue-200' },
+    { name: 'Roxo', value: 'bg-purple-100 text-purple-700 border-purple-200' },
+    { name: 'Rosa', value: 'bg-pink-100 text-pink-700 border-pink-200' },
+];
 
 interface ProjectLibraryViewProps {
     projects: Project[];
@@ -88,11 +121,149 @@ function LightbulbIcon(props: any) {
 
 const statusConfig: Record<ProjectStatus, { label: string; icon: React.ElementType; color: string }> = {
     'Ideia': { label: 'Ideia', icon: LightbulbIcon, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-    'Planejamento': { label: 'Planejamento', icon: Calendar, color: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
+    'Planejamento': { label: 'Planejamento', icon: CalendarIcon, color: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
     'Em progresso': { label: 'Em progresso', icon: Clock, color: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
     'Finalizado': { label: 'Finalizado', icon: CheckCircle2, color: 'bg-green-500/10 text-green-500 border-green-500/20' },
     'Arquivado': { label: 'Arquivado', icon: Archive, color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
 };
+
+// Helper component for the Tag Cell to handle local state
+function TagSelectorCell({
+    projectTags,
+    allProjects,
+    onSelect
+}: {
+    projectTags: { id: string; label: string; color: string }[];
+    allProjects: Project[];
+    onSelect: (tag: { id: string; label: string; color: string }) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [inputValue, setInputValue] = useState("");
+
+    // Create a list of unique existing tags across all projects
+    const existingTags = React.useMemo(() => {
+        const tags = new Map();
+        allProjects.forEach(p => {
+            p.tags?.forEach(t => {
+                // Use label as key to deduplicate by name, but keep the object
+                if (!tags.has(t.label.toLowerCase())) {
+                    tags.set(t.label.toLowerCase(), t);
+                }
+            });
+        });
+        return Array.from(tags.values());
+    }, [allProjects]);
+
+    const handleCreateTag = (color: string) => {
+        if (!inputValue.trim()) return;
+        const newTag = {
+            id: Math.random().toString(36).substr(2, 9),
+            label: inputValue,
+            color
+        };
+        onSelect(newTag);
+        setOpen(false);
+        setInputValue("");
+    };
+
+    const currentTag = projectTags?.[0];
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="ghost"
+                    className={cn(
+                        "h-7 w-fit px-2 text-xs font-normal justify-start hover:bg-muted/50 transition-all",
+                        !currentTag && "text-muted-foreground border border-dashed border-border"
+                    )}
+                >
+                    {currentTag ? (
+                        <div className="flex items-center gap-1.5">
+                            <div className={cn("px-2 py-0.5 rounded-full flex items-center gap-1", currentTag.color)}>
+                                <span className="truncate max-w-[100px]">{currentTag.label}</span>
+                            </div>
+                            {projectTags.length > 1 && (
+                                <span className="text-[10px] text-muted-foreground font-medium">+{projectTags.length - 1}</span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="flex items-center gap-1.5"><Plus className="w-3 h-3" /> Adicionar Tag</span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                <Command>
+                    <CommandInput
+                        placeholder="Procurar ou criar tag..."
+                        value={inputValue}
+                        onValueChange={setInputValue}
+                    />
+                    <CommandList>
+                        <CommandEmpty className="pb-1">
+                            {inputValue && (
+                                <div className="p-2 space-y-2">
+                                    <p className="text-xs text-muted-foreground px-2">Criar "{inputValue}" com cor:</p>
+                                    <div className="grid grid-cols-4 gap-2 px-2 pb-2">
+                                        {TAG_COLORS.map((color) => (
+                                            <button
+                                                key={color.name}
+                                                className={cn(
+                                                    "h-6 w-full rounded-sm border cursor-pointer hover:scale-105 transition-transform",
+                                                    color.value
+                                                )}
+                                                onClick={() => handleCreateTag(color.value)}
+                                                title={color.name}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {!inputValue && <p className="py-6 text-center text-sm text-muted-foreground">Digite para criar uma nova tag</p>}
+                        </CommandEmpty>
+
+                        {projectTags.length > 0 && (
+                            <CommandGroup heading="Tags do Projeto">
+                                {projectTags.map(tag => (
+                                    <CommandItem
+                                        key={tag.id}
+                                        onSelect={() => {
+                                            onSelect(tag);
+                                            setOpen(false);
+                                        }}
+                                        className="cursor-pointer bg-muted/30"
+                                    >
+                                        <div className={cn("flex items-center gap-2 px-2 py-1 rounded text-xs", tag.color)}>
+                                            {tag.label}
+                                        </div>
+                                        <CheckCircle2 className="w-3 h-3 ml-auto opacity-100 text-primary" />
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        )}
+
+                        <CommandGroup heading="Outras Tags">
+                            {existingTags.filter(t => !projectTags.some(pt => pt.id === t.id || pt.label.toLowerCase() === t.label.toLowerCase())).map(tag => (
+                                <CommandItem
+                                    key={tag.id}
+                                    onSelect={() => {
+                                        onSelect(tag);
+                                        setOpen(false);
+                                    }}
+                                    className="cursor-pointer"
+                                >
+                                    <div className={cn("flex items-center gap-2 px-2 py-1 rounded text-xs", tag.color)}>
+                                        {tag.label}
+                                    </div>
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 export function ProjectLibraryView({
     projects,
@@ -106,13 +277,47 @@ export function ProjectLibraryView({
     const [newProjectData, setNewProjectData] = useState({
         name: '',
         description: '',
-        checklist: [] as { id: string; label: string; completed: boolean }[]
+        script: '',
+        scriptMode: 'simple' as 'simple' | 'structured',
+        structuredScript: [] as { id: string; content: string; isCompleted: boolean }[],
+        tags: [] as { id: string; label: string; color: string }[],
+        checklist: [] as { id: string; label: string; completed: boolean }[],
+        deadline: undefined as Date | undefined
     });
+    const [tagInput, setTagInput] = useState('');
+    const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
+    const [editingTagId, setEditingTagId] = useState<string | null>(null);
+    const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
 
     const filteredProjects = projects.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+        p.tags?.some(tag => tag.label.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+
+    const handleAddTag = (label: string, color: string) => {
+        if (!label) return;
+        setNewProjectData(prev => ({
+            ...prev,
+            tags: [...prev.tags, { id: Math.random().toString(36).substr(2, 9), label, color }]
+        }));
+        setTagInput('');
+        setIsTagPopoverOpen(false);
+    };
+
+    const handleUpdateTag = (id: string, updates: { label?: string, color?: string }) => {
+        setNewProjectData(prev => ({
+            ...prev,
+            tags: prev.tags.map(t => t.id === id ? { ...t, ...updates } : t)
+        }));
+    };
+
+    const handleDeleteTag = (id: string) => {
+        setNewProjectData(prev => ({
+            ...prev,
+            tags: prev.tags.filter(t => t.id !== id)
+        }));
+        if (editingTagId === id) setEditingTagId(null);
+    };
 
     const handleAddStep = () => {
         setNewProjectData(prev => ({
@@ -135,13 +340,49 @@ export function ProjectLibraryView({
         }));
     };
 
+    const handleEditProject = (project: Project) => {
+        setEditingProjectId(project.id);
+        setNewProjectData({
+            name: project.name,
+            description: project.description || '',
+            script: project.script || '',
+            scriptMode: project.scriptMode || 'simple',
+            structuredScript: project.structuredScript || [],
+            tags: project.tags || [],
+            checklist: project.checklist || [],
+            deadline: project.deadline ? new Date(project.deadline) : undefined
+        });
+        setIsCreateDialogOpen(true);
+    };
+
     const handleSubmitCreate = () => {
         if (!newProjectData.name) return;
-        onCreateProject(newProjectData.name, {
-            description: newProjectData.description,
-            checklist: newProjectData.checklist
-        });
-        setNewProjectData({ name: '', description: '', checklist: [] });
+
+        if (editingProjectId) {
+            onUpdateProject(editingProjectId, {
+                name: newProjectData.name,
+                description: newProjectData.description,
+                script: newProjectData.script,
+                scriptMode: newProjectData.scriptMode,
+                structuredScript: newProjectData.structuredScript,
+                tags: newProjectData.tags,
+                checklist: newProjectData.checklist,
+                deadline: newProjectData.deadline ? new Date(newProjectData.deadline) : undefined
+            });
+        } else {
+            onCreateProject(newProjectData.name, {
+                description: newProjectData.description,
+                script: newProjectData.script,
+                scriptMode: newProjectData.scriptMode,
+                structuredScript: newProjectData.structuredScript,
+                tags: newProjectData.tags,
+                checklist: newProjectData.checklist,
+                deadline: newProjectData.deadline ? new Date(newProjectData.deadline) : undefined
+            });
+        }
+
+        setNewProjectData({ name: '', description: '', script: '', scriptMode: 'simple', structuredScript: [], tags: [], checklist: [], deadline: undefined });
+        setEditingProjectId(null);
         setIsCreateDialogOpen(false);
     };
 
@@ -154,341 +395,657 @@ export function ProjectLibraryView({
         }).format(new Date(date));
     };
 
+    const handleImageUpload = (file: File, projectId: string) => {
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                onUpdateProject(projectId, { coverImage: result });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     return (
         <div className="flex-1 flex flex-col bg-background overflow-hidden animate-in fade-in duration-500">
             {/* Header */}
-            <div className="flex flex-col gap-6 px-10 pt-12 pb-8">
+            <div className="flex flex-col gap-6 px-10 pt-12 pb-8 max-w-7xl mx-auto w-full">
                 <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                        <h1 className="text-3xl font-bold tracking-tight">Projetos</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Projetos</h1>
                         <p className="text-muted-foreground">Gerencie seus storyboards e fluxos criativos.</p>
                     </div>
 
-                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="lg" className="gap-2 px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-                                <Plus className="w-5 h-5" />
-                                Novo Projeto
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                                <DialogTitle>Criar Novo Projeto</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-6 pt-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nome do Projeto</Label>
-                                    <Input
-                                        id="name"
-                                        placeholder="Ex: Curta Metragem Sci-Fi"
-                                        value={newProjectData.name}
-                                        onChange={(e) => setNewProjectData(prev => ({ ...prev, name: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="desc">Descrição</Label>
-                                    <Input
-                                        id="desc"
-                                        placeholder="Uma breve descrição do seu projeto..."
-                                        value={newProjectData.description}
-                                        onChange={(e) => setNewProjectData(prev => ({ ...prev, description: e.target.value }))}
-                                    />
-                                </div>
+                    <div className="flex items-center gap-4">
+                        <div className="relative group w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Input
+                                placeholder="Buscar projetos..."
+                                className="pl-10 h-10 bg-muted/40 border-border/50 focus:bg-background transition-all"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
 
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="flex items-center gap-2">
-                                            <ListTodo className="w-4 h-4 text-primary" />
-                                            Checklist de Etapas
-                                        </Label>
-                                        <Button variant="outline" size="sm" onClick={handleAddStep} className="h-8 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary">
-                                            <Plus className="w-3.5 h-3.5" />
-                                            Nova Etapa
-                                        </Button>
+                        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+                            setIsCreateDialogOpen(open);
+                            if (!open) {
+                                setEditingProjectId(null);
+                                setNewProjectData({ name: '', description: '', script: '', scriptMode: 'simple', structuredScript: [], tags: [], checklist: [], deadline: undefined });
+                            }
+                        }}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    className="gap-2 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 transition-all hover:scale-[1.02]"
+                                    onClick={() => {
+                                        setEditingProjectId(null);
+                                        setNewProjectData({ name: '', description: '', script: '', scriptMode: 'simple', structuredScript: [], tags: [], checklist: [], deadline: undefined });
+                                    }}
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    Novo Projeto
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[800px] gap-6">
+                                <DialogHeader>
+                                    <DialogTitle className="text-xl">{editingProjectId ? 'Editar Projeto' : 'Criar Novo Projeto'}</DialogTitle>
+                                </DialogHeader>
+                                <div className="grid gap-6 py-4">
+                                    <div className="grid grid-cols-12 gap-4">
+                                        <div className="col-span-8 space-y-2">
+                                            <Label htmlFor="name">Nome do Projeto</Label>
+                                            <Input
+                                                id="name"
+                                                placeholder="Ex: Curta Metragem Sci-Fi"
+                                                value={newProjectData.name}
+                                                onChange={(e) => setNewProjectData(prev => ({ ...prev, name: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="col-span-4 space-y-2">
+                                            <Label htmlFor="deadline">Meta de Execução</Label>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        className={cn(
+                                                            "w-full justify-start text-left font-normal h-10",
+                                                            !newProjectData.deadline && "text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                                        {newProjectData.deadline ? (
+                                                            formatDate(newProjectData.deadline).split(',')[0]
+                                                        ) : (
+                                                            <span>Definir Meta</span>
+                                                        )}
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-4" align="start">
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <div className="space-y-0.5">
+                                                                <Label className="text-base">Data Término</Label>
+                                                                <p className="text-[0.8rem] text-muted-foreground">
+                                                                    Definir prazo final para o projeto
+                                                                </p>
+                                                            </div>
+                                                            <Switch
+                                                                checked={!!newProjectData.deadline}
+                                                                onCheckedChange={(checked) => {
+                                                                    setNewProjectData(prev => ({
+                                                                        ...prev,
+                                                                        deadline: checked ? new Date() : undefined
+                                                                    }))
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {newProjectData.deadline && (
+                                                            <div className="rounded-md border animate-in fade-in zoom-in-95 duration-200">
+                                                                <Calendar
+                                                                    mode="single"
+                                                                    selected={newProjectData.deadline}
+                                                                    onSelect={(date) => setNewProjectData(prev => ({ ...prev, deadline: date }))}
+                                                                    initialFocus
+                                                                    locale={ptBR}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </div>
+                                        <div className="col-span-12 space-y-2">
+                                            <Label htmlFor="desc">Descrição</Label>
+                                            <Input
+                                                id="desc"
+                                                placeholder="Breve descrição..."
+                                                value={newProjectData.description}
+                                                onChange={(e) => setNewProjectData(prev => ({ ...prev, description: e.target.value }))}
+                                            />
+                                        </div>
                                     </div>
 
-                                    <ScrollArea className="max-h-[200px] pr-4">
-                                        <div className="space-y-2">
-                                            {newProjectData.checklist.map((step) => (
-                                                <div key={step.id} className="flex items-center gap-2 group animate-in slide-in-from-top-1 duration-200">
-                                                    <div className="w-5 h-5 border border-muted rounded flex items-center justify-center bg-muted/50">
-                                                        <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center justify-between">
+                                            Roteiro / História
+                                            <span className="text-xs text-muted-foreground font-normal">Opcional</span>
+                                        </Label>
+                                        <Tabs
+                                            defaultValue="simple"
+                                            value={newProjectData.scriptMode}
+                                            onValueChange={(val) => {
+                                                const mode = val as 'simple' | 'structured';
+                                                setNewProjectData(prev => {
+                                                    const newData = { ...prev, scriptMode: mode };
+                                                    // Auto-add first scene if empty when switching to structured
+                                                    if (mode === 'structured' && prev.structuredScript.length === 0) {
+                                                        newData.structuredScript = [{ id: Math.random().toString(36).substr(2, 9), content: '', isCompleted: false }];
+                                                    }
+                                                    return newData;
+                                                });
+                                            }}
+                                            className="w-full"
+                                        >
+                                            <TabsList className="grid w-full grid-cols-2 mb-2">
+                                                <TabsTrigger value="simple">Texto Completo</TabsTrigger>
+                                                <TabsTrigger value="structured">Por Cenas</TabsTrigger>
+                                            </TabsList>
+                                            <TabsContent value="simple" className="mt-0">
+                                                <Textarea
+                                                    placeholder="Cole aqui sua história completa, roteiro ou descrição das cenas..."
+                                                    className="h-[200px] resize-none font-mono text-sm leading-relaxed custom-scrollbar"
+                                                    value={newProjectData.script}
+                                                    onChange={(e) => setNewProjectData(prev => ({ ...prev, script: e.target.value }))}
+                                                />
+                                            </TabsContent>
+                                            <TabsContent value="structured" className="mt-0 space-y-3">
+                                                <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+                                                    <div className="space-y-3 pr-4">
+                                                        {newProjectData.structuredScript.map((scene, index) => (
+                                                            <div key={scene.id} className="flex gap-2 items-start group">
+                                                                <div className="mt-2">
+                                                                    <Checkbox
+                                                                        checked={scene.isCompleted}
+                                                                        onCheckedChange={(checked) => {
+                                                                            setNewProjectData(prev => ({
+                                                                                ...prev,
+                                                                                structuredScript: prev.structuredScript.map(s => s.id === scene.id ? { ...s, isCompleted: !!checked } : s)
+                                                                            }))
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <Textarea
+                                                                    placeholder={`Cena ${index + 1}...`}
+                                                                    className="min-h-[60px] resize-y flex-1"
+                                                                    value={scene.content}
+                                                                    onChange={(e) => {
+                                                                        setNewProjectData(prev => ({
+                                                                            ...prev,
+                                                                            structuredScript: prev.structuredScript.map(s => s.id === scene.id ? { ...s, content: e.target.value } : s)
+                                                                        }))
+                                                                    }}
+                                                                />
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity mt-1"
+                                                                    onClick={() => {
+                                                                        setNewProjectData(prev => ({
+                                                                            ...prev,
+                                                                            structuredScript: prev.structuredScript.filter(s => s.id !== scene.id)
+                                                                        }))
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                        {newProjectData.structuredScript.length === 0 && (
+                                                            <div className="text-center py-8 border-2 border-dashed border-muted rounded-lg text-muted-foreground text-sm">
+                                                                Adicione cenas para organizar seu roteiro.
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <Input
-                                                        placeholder="Nome da etapa..."
-                                                        className="h-9 flex-1 bg-muted/20 border-transparent focus:bg-background transition-all"
-                                                        value={step.label}
-                                                        onChange={(e) => handleUpdateStepLabel(step.id, e.target.value)}
-                                                        autoFocus={step.label === ''}
-                                                    />
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleRemoveStep(step.id)}
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                            {newProjectData.checklist.length === 0 && (
-                                                <div className="text-center py-6 border-2 border-dashed border-muted rounded-lg">
-                                                    <p className="text-xs text-muted-foreground">Nenhuma etapa definida.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </ScrollArea>
-                                </div>
-                            </div>
-                            <DialogFooter className="pt-6">
-                                <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
-                                <Button onClick={handleSubmitCreate} disabled={!newProjectData.name}>Criar Projeto</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                                                </ScrollArea>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="w-full border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-medium transition-all hover:border-primary/40 h-10"
+                                                    onClick={() => {
+                                                        setNewProjectData(prev => ({
+                                                            ...prev,
+                                                            structuredScript: [...prev.structuredScript, { id: Math.random().toString(36).substr(2, 9), content: '', isCompleted: false }]
+                                                        }))
+                                                    }}
+                                                >
+                                                    <Plus className="w-4 h-4 mr-2" /> Adicionar Cena
+                                                </Button>
+                                            </TabsContent>
+                                        </Tabs>
+                                    </div>
 
-                <div className="flex items-center gap-4 max-w-md">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            placeholder="Buscar por nome ou tags..."
-                            className="pl-10 h-11 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50 transition-all"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {/* Coluna Esquerda: Tags */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="flex items-center gap-2">
+                                                    <Tag className="w-4 h-4 text-primary" />
+                                                    Tags do Projeto
+                                                </Label>
+                                            </div>
+                                            <div className="border rounded-md p-3 h-[150px] overflow-y-auto flex flex-col gap-3 custom-scrollbar">
+                                                <div className="flex gap-2">
+                                                    <Popover open={isTagPopoverOpen} onOpenChange={(open) => {
+                                                        setIsTagPopoverOpen(open);
+                                                        if (!open) setEditingTagId(null);
+                                                    }}>
+                                                        <PopoverTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                role="combobox"
+                                                                aria-expanded={isTagPopoverOpen}
+                                                                className="w-full justify-between h-9 text-muted-foreground font-normal overflow-hidden"
+                                                            >
+                                                                {tagInput ? tagInput : "Adicionar ou gerenciar tags..."}
+                                                                <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-[300px] p-0" align="start">
+                                                            {editingTagId ? (
+                                                                <div className="p-2">
+                                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingTagId(null)}>
+                                                                            <ChevronLeft className="h-4 w-4" />
+                                                                        </Button>
+                                                                        <span className="font-medium text-sm">Editar Tag</span>
+                                                                    </div>
+                                                                    <div className="space-y-3 p-1">
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-xs">Nome</Label>
+                                                                            <Input
+                                                                                value={newProjectData.tags.find(t => t.id === editingTagId)?.label || ''}
+                                                                                onChange={(e) => handleUpdateTag(editingTagId, { label: e.target.value })}
+                                                                                className="h-8"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-xs">Cor</Label>
+                                                                            <div className="grid grid-cols-4 gap-2">
+                                                                                {TAG_COLORS.map((color) => (
+                                                                                    <button
+                                                                                        key={color.name}
+                                                                                        className={cn(
+                                                                                            "h-6 w-full rounded-sm border cursor-pointer hover:scale-105 transition-transform",
+                                                                                            color.value,
+                                                                                            newProjectData.tags.find(t => t.id === editingTagId)?.color === color.value && "ring-2 ring-primary ring-offset-1"
+                                                                                        )}
+                                                                                        onClick={() => handleUpdateTag(editingTagId, { color: color.value })}
+                                                                                        title={color.name}
+                                                                                    />
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="destructive"
+                                                                            size="sm"
+                                                                            className="w-full mt-2 h-8"
+                                                                            onClick={() => handleDeleteTag(editingTagId)}
+                                                                        >
+                                                                            Excluir Tag
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <Command>
+                                                                    <CommandInput
+                                                                        placeholder="Procurar ou criar tag..."
+                                                                        value={tagInput}
+                                                                        onValueChange={setTagInput}
+                                                                    />
+                                                                    <CommandList>
+                                                                        <CommandEmpty>
+                                                                            {tagInput && (
+                                                                                <div className="p-2 space-y-2">
+                                                                                    <p className="text-xs text-muted-foreground px-2">Criar "{tagInput}" com cor:</p>
+                                                                                    <div className="grid grid-cols-4 gap-2 px-2 pb-2">
+                                                                                        {TAG_COLORS.map((color) => (
+                                                                                            <button
+                                                                                                key={color.name}
+                                                                                                className={cn(
+                                                                                                    "h-6 w-full rounded-sm border cursor-pointer hover:scale-105 transition-transform",
+                                                                                                    color.value
+                                                                                                )}
+                                                                                                onClick={() => {
+                                                                                                    handleAddTag(tagInput, color.value);
+                                                                                                }}
+                                                                                                title={color.name}
+                                                                                            />
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {!tagInput && <p className="py-6 text-center text-sm text-muted-foreground">Digite para criar uma nova tag</p>}
+                                                                        </CommandEmpty>
+                                                                        {newProjectData.tags.length > 0 && (
+                                                                            <CommandGroup heading="Tags Criadas">
+                                                                                {newProjectData.tags.map(tag => (
+                                                                                    <CommandItem key={tag.id} className="group flex justify-between items-center" onSelect={() => { }}>
+                                                                                        <div className={cn("flex items-center gap-2 px-2 py-1 rounded text-xs", tag.color)}>
+                                                                                            {tag.label}
+                                                                                        </div>
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="icon"
+                                                                                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setEditingTagId(tag.id);
+                                                                                            }}
+                                                                                        >
+                                                                                            <MoreHorizontal className="w-4 h-4" />
+                                                                                        </Button>
+                                                                                    </CommandItem>
+                                                                                ))}
+                                                                            </CommandGroup>
+                                                                        )}
+                                                                    </CommandList>
+                                                                </Command>
+                                                            )}
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 content-start">
+                                                    {newProjectData.tags.map(tag => (
+                                                        <Badge
+                                                            key={tag.id}
+                                                            variant="outline"
+                                                            className={cn("pl-2 pr-1 py-1 flex items-center gap-1 border-transparent cursor-pointer group hover:opacity-80 transition-opacity", tag.color)}
+                                                            onClick={() => {
+                                                                setEditingTagId(tag.id);
+                                                                setIsTagPopoverOpen(true);
+                                                            }}
+                                                        >
+                                                            {tag.label}
+                                                        </Badge>
+                                                    ))}
+                                                    {newProjectData.tags.length === 0 && (
+                                                        <span className="text-xs text-muted-foreground italic p-2">Sem tags adicionadas.</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Coluna Direita: Checklist */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="flex items-center gap-2">
+                                                    <ListTodo className="w-4 h-4 text-primary" />
+                                                    Etapas do Projeto
+                                                </Label>
+                                                <Button variant="outline" size="sm" onClick={handleAddStep} className="h-8 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary">
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    Nova
+                                                </Button>
+                                            </div>
+
+                                            <ScrollArea className="h-[150px] w-full rounded-md border p-3">
+                                                <div className="space-y-2 pr-3">
+                                                    {newProjectData.checklist.map((step) => (
+                                                        <div key={step.id} className="flex items-center gap-2 group animate-in slide-in-from-top-1 duration-200">
+                                                            <div className="w-4 h-4 border border-muted rounded flex items-center justify-center bg-muted/50 flex-shrink-0">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                                                            </div>
+                                                            <Input
+                                                                placeholder="Nome da etapa..."
+                                                                className="h-8 text-xs flex-1 bg-muted/20 border-transparent focus:bg-background transition-all"
+                                                                value={step.label}
+                                                                onChange={(e) => handleUpdateStepLabel(step.id, e.target.value)}
+                                                                autoFocus={step.label === ''}
+                                                            />
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => handleRemoveStep(step.id)}
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    {newProjectData.checklist.length === 0 && (
+                                                        <div className="text-center py-12 text-muted-foreground text-xs">
+                                                            Nenhuma etapa definida.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </ScrollArea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <DialogFooter className="pt-6">
+                                    <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
+                                    <Button onClick={handleSubmitCreate} disabled={!newProjectData.name}>{editingProjectId ? 'Salvar Alterações' : 'Criar Projeto'}</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
             </div>
 
-            {/* Content Table */}
-            <div className="flex-1 overflow-x-auto px-10">
-                <div className="min-w-[1200px] pb-20">
-                    <Table>
-                        <TableHeader className="hover:bg-transparent">
-                            <TableRow className="border-b border-border/50 hover:bg-transparent">
-                                <TableHead className="w-[280px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Nome</TableHead>
-                                <TableHead className="w-[220px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Descrição</TableHead>
-                                <TableHead className="w-[160px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Status</TableHead>
-                                <TableHead className="w-[240px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Processo (Checklist)</TableHead>
-                                <TableHead className="w-[180px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Tags</TableHead>
-                                <TableHead className="w-[150px] font-medium text-xs uppercase tracking-wider text-muted-foreground py-4">Última Modificação</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+            {/* Content Grid */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-10 pb-12">
+                <div className="max-w-7xl mx-auto">
+                    {filteredProjects.length === 0 ? (
+                        <div className="text-center py-20 opacity-50">
+                            <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
+                            <p className="text-lg text-muted-foreground">Nenhum projeto encontrado.</p>
+                            <Button variant="link" onClick={() => setNewProjectData({ ...newProjectData })} className="mt-2">Criar um novo projeto</Button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredProjects.map((project) => (
-                                <TableRow
+                                <div
                                     key={project.id}
-                                    className="group border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
+                                    className="group relative flex flex-col bg-card border border-border/40 hover:border-primary/50 rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
                                     onClick={() => onSelectProject(project.id)}
                                 >
-                                    {/* Nome */}
-                                    <TableCell className="py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                <FileText className="w-4 h-4 text-primary" />
+                                    {/* Project Cover */}
+                                    <div
+                                        className="h-40 bg-gradient-to-br from-primary/5 via-background to-secondary/5 relative overflow-hidden group-hover:from-primary/10 group-hover:to-secondary/10 transition-colors"
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.currentTarget.classList.add('border-primary', 'bg-primary/5');
+                                        }}
+                                        onDragLeave={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                                            const file = e.dataTransfer.files?.[0];
+                                            if (file) handleImageUpload(file, project.id);
+                                        }}
+                                    >
+                                        {project.coverImage ? (
+                                            <div className="absolute inset-0">
+                                                <img
+                                                    src={project.coverImage}
+                                                    alt={project.name}
+                                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                />
+                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                                             </div>
-                                            <input
-                                                className="bg-transparent border-none focus:outline-none focus:ring-0 font-medium text-sm w-full truncate cursor-pointer focus:cursor-text"
-                                                value={project.name}
-                                                onClick={(e) => e.stopPropagation()}
-                                                onChange={(e) => onUpdateProject(project.id, { name: e.target.value })}
-                                            />
-                                        </div>
-                                    </TableCell>
+                                        ) : (
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] group-hover:opacity-[0.06] transition-opacity top-4">
+                                                <FileText className="w-32 h-32" />
+                                            </div>
+                                        )}
 
-                                    {/* Descrição */}
-                                    <TableCell className="py-4">
-                                        <input
-                                            className="bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-muted-foreground w-full truncate cursor-pointer focus:cursor-text"
-                                            value={project.description || ''}
-                                            placeholder="Sem descrição..."
+                                        {/* Upload Overlay */}
+                                        <label
+                                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
                                             onClick={(e) => e.stopPropagation()}
-                                            onChange={(e) => onUpdateProject(project.id, { description: e.target.value })}
-                                        />
-                                    </TableCell>
-
-                                    {/* Status */}
-                                    <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
-                                        <Select
-                                            value={project.status}
-                                            onValueChange={(value: ProjectStatus) => onUpdateProject(project.id, { status: value })}
                                         >
-                                            <SelectTrigger className="h-8 border-none bg-transparent hover:bg-muted shadow-none px-2 focus:ring-0">
-                                                <SelectValue>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={cn("font-medium text-[10px] py-0 px-2 flex items-center gap-1.5", statusConfig[project.status].color)}
-                                                    >
-                                                        {React.createElement(statusConfig[project.status].icon, { className: "w-3 h-3" })}
-                                                        {statusConfig[project.status].label}
-                                                    </Badge>
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(statusConfig).map(([key, config]) => (
-                                                    <SelectItem key={key} value={key}>
-                                                        <div className="flex items-center gap-2">
-                                                            <config.icon className="w-4 h-4" />
-                                                            {config.label}
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
+                                            <Upload className="w-8 h-8 text-white mb-2" />
+                                            <span className="text-xs text-white font-medium">Alterar Capa</span>
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) handleImageUpload(file, project.id);
+                                                }}
+                                            />
+                                        </label>
 
-                                    {/* Checklist & Progresso */}
-                                    <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center justify-between gap-3 pr-6">
-                                                <div className="flex-1">
-                                                    <Progress value={project.progress} className="h-2" />
-                                                </div>
-                                                <span className="text-[10px] font-bold text-muted-foreground min-w-[30px] text-right">{project.progress}%</span>
-                                            </div>
-
+                                        {/* Actions Menu (Top Right) */}
+                                        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors group/edit-steps cursor-pointer">
-                                                        <ListTodo className="w-3.5 h-3.5" />
-                                                        <span>{project.checklist?.filter(s => s.completed).length || 0}/{project.checklist?.length || 0} etapas</span>
-                                                        <ChevronRight className="w-3 h-3 opacity-0 group-hover/edit-steps:opacity-100 transition-all group-hover/edit-steps:translate-x-0.5" />
-                                                    </div>
+                                                    <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm bg-background/80 backdrop-blur-sm hover:bg-background">
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent className="w-64 p-3 bg-card border-border shadow-xl" align="start">
-                                                    <div className="space-y-3">
-                                                        <div className="flex items-center justify-between mb-1">
-                                                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Etapas do Projeto</span>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6 text-primary hover:bg-primary/10"
-                                                                onClick={() => {
-                                                                    const label = prompt('Nome da nova etapa:');
-                                                                    if (label) {
-                                                                        const newStep = { id: Math.random().toString(36).substr(2, 9), label, completed: false };
-                                                                        onUpdateProject(project.id, { checklist: [...(project.checklist || []), newStep] });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Plus className="w-3.5 h-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                        <ScrollArea className="max-h-[250px]">
-                                                            <div className="space-y-2 pb-2">
-                                                                {project.checklist?.map((step) => (
-                                                                    <div key={step.id} className="flex items-center gap-2 group/step">
-                                                                        <Checkbox
-                                                                            checked={step.completed}
-                                                                            onCheckedChange={(checked) => {
-                                                                                const updatedChecklist = project.checklist.map(s =>
-                                                                                    s.id === step.id ? { ...s, completed: !!checked } : s
-                                                                                );
-                                                                                onUpdateProject(project.id, { checklist: updatedChecklist });
-                                                                            }}
-                                                                        />
-                                                                        <input
-                                                                            className={cn(
-                                                                                "bg-transparent border-none focus:outline-none focus:ring-0 text-xs flex-1 truncate",
-                                                                                step.completed && "text-muted-foreground line-through opacity-50"
-                                                                            )}
-                                                                            value={step.label}
-                                                                            onChange={(e) => {
-                                                                                const updatedChecklist = project.checklist.map(s =>
-                                                                                    s.id === step.id ? { ...s, label: e.target.value } : s
-                                                                                );
-                                                                                onUpdateProject(project.id, { checklist: updatedChecklist });
-                                                                            }}
-                                                                        />
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-5 w-5 opacity-0 group-hover/step:opacity-100 hover:text-destructive"
-                                                                            onClick={() => {
-                                                                                const updatedChecklist = project.checklist.filter(s => s.id !== step.id);
-                                                                                onUpdateProject(project.id, { checklist: updatedChecklist });
-                                                                            }}
-                                                                        >
-                                                                            <X className="w-3 h-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                                {(!project.checklist || project.checklist.length === 0) && (
-                                                                    <p className="text-[10px] text-muted-foreground italic text-center py-4">Sem etapas definidas.</p>
-                                                                )}
-                                                            </div>
-                                                        </ScrollArea>
-                                                    </div>
+                                                <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuItem onClick={() => onSelectProject(project.id)} className="cursor-pointer">
+                                                        <ExternalLink className="w-4 h-4 mr-2" /> Abrir no Canvas
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleEditProject(project)} className="cursor-pointer">
+                                                        <Edit className="w-4 h-4 mr-2" /> Editar Projeto
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer" onClick={() => onDeleteProject(project.id)}>
+                                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir Projeto
+                                                    </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
-                                    </TableCell>
 
-                                    {/* Tags */}
-                                    <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex flex-wrap gap-1.5 max-w-[180px]">
-                                            {(project.tags || []).map((tag, i) => (
-                                                <Badge key={i} variant="secondary" className="bg-muted/50 text-[10px] px-2 py-0 font-normal">
-                                                    {tag}
-                                                </Badge>
-                                            ))}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-5 w-5 rounded-md hover:bg-muted"
-                                                onClick={() => {
-                                                    const tag = prompt('Adicionar tag:');
-                                                    if (tag) {
-                                                        const currentTags = project.tags || [];
-                                                        if (!currentTags.includes(tag)) {
-                                                            onUpdateProject(project.id, { tags: [...currentTags, tag] });
-                                                        }
-                                                    }
+                                        {/* Status / Date Badge (Top Left) */}
+                                        <div className="absolute top-3 left-3 flex gap-2">
+                                            <div className="px-2.5 py-1 rounded-full bg-background/60 backdrop-blur-md border border-border/50 text-[10px] font-medium text-muted-foreground flex items-center gap-1.5 shadow-sm">
+                                                <CalendarIcon className="w-3 h-3" />
+                                                {formatDate(project.updatedAt)}
+                                            </div>
+                                            {project.deadline && (
+                                                <div className={cn(
+                                                    "px-2.5 py-1 rounded-full backdrop-blur-md border text-[10px] font-medium flex items-center gap-1.5 shadow-sm",
+                                                    new Date(project.deadline) < new Date() ? "bg-red-500/80 border-red-400 text-white" : "bg-background/60 border-border/50 text-muted-foreground"
+                                                )}>
+                                                    <Clock className="w-3 h-3" />
+                                                    {new Date(project.deadline).toLocaleDateString('pt-BR')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Card Body */}
+                                    <div className="flex flex-col flex-1 p-5 gap-4">
+                                        {/* Title & Desc */}
+                                        <div className="space-y-2">
+                                            <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                                                {project.name}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground line-clamp-2 h-10 leading-relaxed">
+                                                {project.description || "Sem descrição..."}
+                                            </p>
+                                        </div>
+
+                                        {/* Progress Section */}
+                                        <div className="space-y-2 pt-2 border-t border-border/40" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="font-medium text-muted-foreground flex items-center gap-1.5">
+                                                    <ListTodo className="w-3.5 h-3.5" />
+                                                    Etapas ({project.checklist?.filter(s => s.completed).length || 0}/{project.checklist?.length || 0})
+                                                </span>
+                                                <span className="font-bold text-primary">{project.progress}%</span>
+                                            </div>
+                                            <Progress value={project.progress} className="h-1.5 bg-muted" />
+
+                                            {/* Checklist Dropdown - Simplified for Card */}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-6 px-2 text-[10px] text-muted-foreground hover:text-primary w-full justify-between mt-1">
+                                                        <span>Gerenciar etapas</span>
+                                                        <ChevronRight className="w-3 h-3" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-72 p-0 bg-popover/95 backdrop-blur-md border-border shadow-xl z-50">
+                                                    <div className="p-3 border-b border-border/50 flex items-center justify-between bg-muted/30">
+                                                        <span className="text-xs font-bold uppercase tracking-wider text-foreground">Etapas do Projeto</span>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-6 w-6 hover:bg-background rounded-full"
+                                                            onClick={() => {
+                                                                const label = prompt('Nome da nova etapa:');
+                                                                if (label) {
+                                                                    const newStep = { id: Math.random().toString(36).substr(2, 9), label, completed: false };
+                                                                    onUpdateProject(project.id, { checklist: [...(project.checklist || []), newStep] });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                    <ScrollArea className="max-h-[250px] overflow-y-auto">
+                                                        <div className="p-2 space-y-1">
+                                                            {project.checklist?.map((step) => (
+                                                                <div key={step.id} className="flex items-start gap-2 p-2 hover:bg-muted/50 rounded-md group/step transition-colors">
+                                                                    <Checkbox
+                                                                        checked={step.completed}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const updatedChecklist = project.checklist.map(s =>
+                                                                                s.id === step.id ? { ...s, completed: !!checked } : s
+                                                                            );
+                                                                            onUpdateProject(project.id, { checklist: updatedChecklist });
+                                                                        }}
+                                                                        className="mt-0.5"
+                                                                    />
+                                                                    <span className={cn("text-xs flex-1 pt-0.5", step.completed && "line-through text-muted-foreground opacity-70")}>
+                                                                        {step.label}
+                                                                    </span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 -mt-0.5 opacity-0 group-hover/step:opacity-100 hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                                                        onClick={() => {
+                                                                            const updatedChecklist = project.checklist.filter(s => s.id !== step.id);
+                                                                            onUpdateProject(project.id, { checklist: updatedChecklist });
+                                                                        }}
+                                                                    >
+                                                                        <X className="w-3 h-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                            {!project.checklist?.length && (
+                                                                <p className="text-center py-4 text-xs text-muted-foreground">Nenhuma etapa.</p>
+                                                            )}
+                                                        </div>
+                                                    </ScrollArea>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+
+                                        {/* Footer: Tags */}
+                                        <div className="mt-auto pt-3 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+                                            <TagSelectorCell
+                                                projectTags={project.tags || []}
+                                                allProjects={projects}
+                                                onSelect={(tag) => {
+                                                    const currentTags = project.tags || [];
+                                                    const otherTags = currentTags.filter(t => t.id !== tag.id);
+                                                    onUpdateProject(project.id, { tags: [tag, ...otherTags] });
                                                 }}
-                                            >
-                                                <Plus className="w-3 h-3" />
-                                            </Button>
+                                            />
                                         </div>
-                                    </TableCell>
-
-                                    {/* Última Modificação */}
-                                    <TableCell className="py-4">
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
-                                            <Calendar className="w-3.5 h-3.5" />
-                                            {formatDate(project.updatedAt)}
-                                        </div>
-                                    </TableCell>
-
-                                    {/* Actions */}
-                                    <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <MoreVertical className="w-4 h-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => onSelectProject(project.id)}>
-                                                    <ExternalLink className="w-4 h-4 mr-2" /> Abrir no Canvas
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => onDeleteProject(project.id)}>
-                                                    <Trash2 className="w-4 h-4 mr-2" /> Excluir Projeto
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
+                                    </div>
+                                </div>
                             ))}
-                        </TableBody>
-                    </Table>
-
-                    {filteredProjects.length === 0 && (
-                        <div className="h-[40vh] flex flex-col items-center justify-center text-center opacity-40 py-12">
-                            <Search className="w-12 h-12 mb-4" />
-                            <h3 className="text-lg font-medium">Nenhum projeto encontrado</h3>
-                            <p className="text-sm">Tente uma busca diferente ou crie um novo projeto.</p>
                         </div>
                     )}
                 </div>

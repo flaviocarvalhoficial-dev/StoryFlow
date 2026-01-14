@@ -125,7 +125,11 @@ export function SequenceModule({
           isTopLevel && sequence.isCollapsed && (
             sequence.layoutDirection === 'horizontal'
               ? index === 0 ? "ml-0" : "-ml-[200px]"
-              : index === 0 ? "mt-0" : "-mt-[200px]"
+              : index === 0 ? "mt-0" : (
+                sequence.aspectRatio === '9:16' ? "-mt-[350px]" :
+                  sequence.aspectRatio === '4:3' ? "-mt-[130px]" :
+                    "-mt-[90px]"
+              )
           )
         )}
         style={isTopLevel && sequence.isCollapsed ? {
@@ -300,7 +304,7 @@ export function SequenceModule({
         >
           <div className="flex items-center justify-between p-1.5">
             <div className="flex items-center gap-0.5 flex-1">
-              <GripVertical className="w-3.5 h-3.5 text-muted-foreground cursor-grab" />
+              <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
             </div>
 
             <div className="flex items-center gap-0.5 no-drag">
@@ -342,6 +346,20 @@ export function SequenceModule({
                       <>
                         <ArrowRight className="w-3.5 h-3.5 mr-2" />
                         Mudar para Horizontal
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onUpdateSequence({ scenesSpacing: sequence.scenesSpacing === 'none' ? 'normal' : 'none' })}>
+                    {sequence.scenesSpacing === 'none' ? (
+                      <>
+                        <Maximize2 className="w-3.5 h-3.5 mr-2" />
+                        Adicionar Espaço
+                      </>
+                    ) : (
+                      <>
+                        <Square className="w-3.5 h-3.5 mr-2" />
+                        Remover Espaço
                       </>
                     )}
                   </DropdownMenuItem>
@@ -436,7 +454,9 @@ export function SequenceModule({
             {index > 0 && (
               <div className={cn(
                 "bg-border transition-all duration-500",
-                sequence.layoutDirection === 'horizontal' ? "w-8 h-0.5" : "h-8 w-0.5",
+                sequence.layoutDirection === 'horizontal'
+                  ? (sequence.scenesSpacing === 'none' ? "w-0 h-0 opacity-0" : "w-8 h-0.5")
+                  : (sequence.scenesSpacing === 'none' ? "h-0 w-0 opacity-0" : "h-8 w-0.5"),
                 sequence.isCollapsed && "w-0 h-0 opacity-0 m-0"
               )} />
             )}

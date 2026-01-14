@@ -269,7 +269,7 @@ export function Canvas({
       <div
         ref={canvasRef}
         className={cn(
-          'w-full h-full canvas-grid select-none outline-none'
+          'w-full h-full canvas-grid select-none outline-none active:cursor-grabbing'
         )}
         style={{
           cursor: showAddButton ? 'crosshair' : 'grab',
@@ -441,6 +441,15 @@ export function Canvas({
           </button>
         </div>
       )}
+      {/* Shortcuts Hints */}
+      <div
+        className="absolute bottom-4 left-4 z-10 pointer-events-none select-none flex items-center gap-4 text-[10px] font-medium transition-colors duration-300"
+        style={{ color: getCanvasDotColor().replace('0.1', '0.4') }}
+      >
+        <span>Duplo Clique: Nova Sequência</span>
+        <span>Alt + Scroll: Zoom</span>
+        <span>Espaço + Drag: Mover</span>
+      </div>
     </div>
   );
 }

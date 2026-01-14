@@ -12,6 +12,7 @@ import { PromptLibraryView } from './PromptLibraryView';
 import { ProjectLibraryView } from './ProjectLibraryView';
 import { MoodBoardView } from './MoodBoardView';
 import { SequenceViewer } from './SequenceViewer';
+import { ScriptSidebar } from './ScriptSidebar';
 import { PromptStyle } from '@/types/storyboard';
 import {
   Dialog,
@@ -35,7 +36,7 @@ export function StoryboardApp() {
   // Interface Settings State
   const [sidebarFontSize, setSidebarFontSize] = useState<'01' | '02' | '03'>(() => {
     const saved = localStorage.getItem('storyflow.sidebarFontSize');
-    return (saved as any) || '02';
+    return (saved as any) || '01';
   });
 
   const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'none'>(() => {
@@ -68,6 +69,8 @@ export function StoryboardApp() {
   useEffect(() => {
     localStorage.setItem('storyflow.defaultRatio', defaultRatio);
   }, [defaultRatio]);
+
+  const [isScriptSidebarOpen, setIsScriptSidebarOpen] = useState(false);
 
   const [contextModal, setContextModal] = useState<{ isOpen: boolean; sequenceId: string | null }>({
     isOpen: false,
@@ -227,6 +230,16 @@ export function StoryboardApp() {
     setCurrentView('prompts');
   };
 
+  const handleUpdateScriptScene = (sceneId: string, isCompleted: boolean) => {
+    if (!currentProject.structuredScript) return;
+
+    const updatedScript = currentProject.structuredScript.map(scene =>
+      scene.id === sceneId ? { ...scene, isCompleted } : scene
+    );
+
+    updateProjectMeta(currentProject.id, { structuredScript: updatedScript });
+  };
+
   return (
     <div className={cn('h-screen flex', isDark && 'dark')}>
       {/* Left Sidebar */}
@@ -271,30 +284,38 @@ export function StoryboardApp() {
 
       {/* Main Content Area */}
       {currentView === 'canvas' ? (
-        <Canvas
-          project={currentProject}
-          onAddSequence={addSequence}
-          onUpdateSequence={updateSequence}
-          onDeleteSequence={deleteSequence}
-          onToggleCollapseSequence={toggleCollapseSequence}
-          onAddScene={addScene}
-          onUpdateScene={updateScene}
-          onDeleteScene={deleteScene}
-          onOpenContext={handleOpenContext}
-          onOpenNotes={handleOpenNotes}
-          onSetCanvasBg={setCanvasBg}
-          onToggleSequenceVisibility={toggleSequenceVisibility}
-          onToggleSceneVisibility={toggleSceneVisibility}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onAddSubscene={handleAddSubscene}
-          onOpenViewer={setViewerSequenceId}
-          gridStyle={gridStyle}
-          connectionStyle={connectionStyle}
-          defaultRatio={defaultRatio}
-        />
+        <div className="flex-1 relative flex overflow-hidden">
+          <Canvas
+            project={currentProject}
+            onAddSequence={addSequence}
+            onUpdateSequence={updateSequence}
+            onDeleteSequence={deleteSequence}
+            onToggleCollapseSequence={toggleCollapseSequence}
+            onAddScene={addScene}
+            onUpdateScene={updateScene}
+            onDeleteScene={deleteScene}
+            onOpenContext={handleOpenContext}
+            onOpenNotes={handleOpenNotes}
+            onSetCanvasBg={setCanvasBg}
+            onToggleSequenceVisibility={toggleSequenceVisibility}
+            onToggleSceneVisibility={toggleSceneVisibility}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onAddSubscene={handleAddSubscene}
+            onOpenViewer={setViewerSequenceId}
+            gridStyle={gridStyle}
+            connectionStyle={connectionStyle}
+            defaultRatio={defaultRatio}
+          />
+          <ScriptSidebar
+            project={currentProject}
+            isOpen={isScriptSidebarOpen}
+            onToggle={() => setIsScriptSidebarOpen(!isScriptSidebarOpen)}
+            onUpdateSceneStatus={handleUpdateScriptScene}
+          />
+        </div>
       ) : currentView === 'prompts' ? (
         <PromptLibraryView
           category={activeCategory}

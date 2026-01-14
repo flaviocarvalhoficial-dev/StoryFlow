@@ -10,7 +10,34 @@ export function useCanvas() {
   });
 
   const isPanning = useRef(false);
+  const isSpacePressed = useRef(false);
   const lastMousePos = useRef<Position>({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        isSpacePressed.current = true;
+        // Optional: Change cursor style here via a callback or state if needed, 
+        // but Canvas.tsx handles cursor logic based on active state usually.
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressed.current = false;
+        if (isPanning.current) {
+          isPanning.current = false;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     if (e.altKey) {
@@ -24,7 +51,8 @@ export function useCanvas() {
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+    // Middle click OR (Left click AND (Shift OR Space))
+    if (e.button === 1 || (e.button === 0 && (e.shiftKey || isSpacePressed.current))) {
       isPanning.current = true;
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     }
