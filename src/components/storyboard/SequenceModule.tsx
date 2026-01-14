@@ -488,10 +488,21 @@ export function SequenceModule({
           )} />
 
           <div className={cn(
-            "w-12 h-12 rounded-lg border-2 border-dashed border-border bg-background flex items-center justify-center transition-colors group-hover:border-primary group-hover:text-primary",
+            "w-12 h-12 rounded-lg relative bg-background flex items-center justify-center transition-colors group-hover:text-primary overflow-hidden",
             sequence.layoutDirection === 'horizontal' ? "ml-0" : "mt-0"
           )}>
-            <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
+            {/* Animated Border */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none">
+              <rect
+                x="2" y="2" width="44" height="44" rx="6" ry="6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeDasharray="6 4"
+                className="text-muted-foreground/30 group-hover:text-primary transition-colors duration-300 animate-dash"
+              />
+            </svg>
+            <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary relative z-10" />
           </div>
         </div>
       </div>

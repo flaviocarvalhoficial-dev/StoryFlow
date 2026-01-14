@@ -158,10 +158,11 @@ export function SceneCard({
 
         {scene.imageUrl ? (
           <>
-            <img
-              src={scene.imageUrl}
-              alt={scene.title}
-              className="w-full h-full object-cover cursor-grab active:cursor-grabbing"
+            <div
+              role="img"
+              aria-label={scene.title}
+              style={{ backgroundImage: `url(${scene.imageUrl})` }}
+              className="w-full h-full bg-cover bg-center cursor-grab active:cursor-grabbing"
               draggable="true"
               onDragStart={(e) => {
                 e.dataTransfer.setData('text/plain', scene.imageUrl || '');
