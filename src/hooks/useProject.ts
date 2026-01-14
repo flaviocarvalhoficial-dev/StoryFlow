@@ -58,11 +58,15 @@ export function useProject() {
           structuredScript: p.structured_script,
           sequences: (p.sequences || []).map((s: any) => ({
             ...s,
+            id: s.id,
+            title: s.title,
             storyContext: s.story_context,
             isCollapsed: s.is_collapsed,
             aspectRatio: s.aspect_ratio,
             layoutDirection: s.layout_direction,
             scenesSpacing: s.scenes_spacing,
+            isVisible: s.is_visible !== false, // default true
+            position: { x: s.position_x || 0, y: s.position_y || 0 }, // Map x/y to position object
             scenes: (s.scenes || []).map((sc: any) => ({
               ...sc,
               imageUrl: sc.image_url,
@@ -70,11 +74,14 @@ export function useProject() {
               isExpanded: sc.is_expanded,
               isSubscene: sc.is_subscene,
               aspectRatio: sc.aspect_ratio,
+              // Map scene position if it uses x/y cols, or keep if JSONB.
+              // Assuming JSONB 'position' based on addScene code, but to be safe:
+              position: sc.position || { x: sc.position_x || 0, y: sc.position_y || 0 }
             })).sort((a: any, b: any) => {
-              // Sort scenes? Maybe by position or creation?
-              // Assuming implicit order for now or we need a position index
-              // Currently Position is {x,y}, not index.
-              return 0;
+              // Sort scenes by creation date or position if available
+              if (a.position?.y !== b.position?.y) return (a.position?.y || 0) - (b.position?.y || 0);
+              if (a.position?.x !== b.position?.x) return (a.position?.x || 0) - (b.position?.x || 0);
+              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
             })
           })),
           connections: (p.connections || []).map((c: any) => ({
@@ -305,7 +312,8 @@ export function useProject() {
       const newSeq = {
         project_id: currentProjectId,
         title: `Sequência`,
-        position: position, // JSONB
+        position_x: position.x,
+        position_y: position.y,
         aspect_ratio: aspectRatio || '16:9',
         is_collapsed: false,
         story_context: ''
@@ -318,6 +326,7 @@ export function useProject() {
       fetchProjects();
     } catch (error) {
       toast.error('Erro ao criar sequência');
+      console.error(error);
     }
   }, [currentProjectId, fetchProjects]);
 
@@ -327,7 +336,11 @@ export function useProject() {
       if (updates.title) dbUpdates.title = updates.title;
       if (updates.storyContext !== undefined) dbUpdates.story_context = updates.storyContext;
       if (updates.isCollapsed !== undefined) dbUpdates.is_collapsed = updates.isCollapsed;
-      if (updates.position) dbUpdates.position = updates.position;
+      // Map position to x/y columns
+      if (updates.position) {
+        dbUpdates.position_x = updates.position.x;
+        dbUpdates.position_y = updates.position.y;
+      }
       if (updates.aspectRatio) dbUpdates.aspect_ratio = updates.aspectRatio;
 
       const { error } = await supabase.from('sequences').update(dbUpdates).eq('id', id);
@@ -386,20 +399,29 @@ export function useProject() {
   }, [currentProjectId]);
 
   // 5. Scenes
-  const addScene = useCallback(async (sequenceId: string, position: Position, parentId?: string, isSubscene?: boolean) => {
+  const addScene = useCallback(async (sequenceId: string, scene: Partial<SceneModule> = {}) => {
     try {
       const newScene = {
         sequence_id: sequenceId,
-        title: isSubscene ? 'Sub-Cena' : 'Cena',
-        position,
-        parent_id: parentId,
-        is_subscene: isSubscene,
-        aspect_ratio: '16:9' // Default
+        title: scene.title || 'Nova Cena',
+        notes: scene.notes || '',
+        position_x: scene.position?.x || 0,
+        position_y: scene.position?.y || 0,
+        aspect_ratio: scene.aspectRatio || '16:9',
+        is_subscene: scene.isSubscene || false,
+        is_expanded: scene.isExpanded || false,
+        is_visible: true,
+        parent_id: scene.parentId || null,
+        image_url: scene.imageUrl
       };
-      const { error } = await supabase.from('scenes').insert(newScene);
+
+      const { data, error } = await supabase.from('scenes').insert(newScene).select().single();
       if (error) throw error;
+
+      // Fetch to sync IDs
       fetchProjects();
     } catch (e) {
+      console.error(e);
       toast.error('Erro ao adicionar cena');
     }
   }, [fetchProjects]);
@@ -409,11 +431,17 @@ export function useProject() {
       const dbUpdates: any = {};
       if (updates.title) dbUpdates.title = updates.title;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-      if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
-      if (updates.position) dbUpdates.position = updates.position;
+      if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl;
+      if (updates.aspectRatio) dbUpdates.aspect_ratio = updates.aspectRatio;
+      if (updates.isExpanded !== undefined) dbUpdates.is_expanded = updates.isExpanded;
+      if (updates.isSubscene !== undefined) dbUpdates.is_subscene = updates.isSubscene;
+      if (updates.parentId !== undefined) dbUpdates.parent_id = updates.parentId;
+      if (updates.isVisible !== undefined) dbUpdates.is_visible = updates.isVisible;
 
-      const { error } = await supabase.from('scenes').update(dbUpdates).eq('id', sceneId);
-      if (error) throw error;
+      if (updates.position) {
+        dbUpdates.position_x = updates.position.x;
+        dbUpdates.position_y = updates.position.y;
+      }
 
       setProjectsState(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
@@ -427,6 +455,8 @@ export function useProject() {
         }
       }));
 
+      const { error } = await supabase.from('scenes').update(dbUpdates).eq('id', sceneId);
+      if (error) throw error;
     } catch (e) {
       console.error(e);
     }
@@ -454,18 +484,15 @@ export function useProject() {
   }, [currentProjectId]);
 
   const toggleSceneVisibility = useCallback((sequenceId: string, sceneId: string) => {
-    setProjectsState(prev => prev.map(p => {
-      if (p.id !== currentProjectId) return p;
-      return {
-        ...p,
-        sequences: p.sequences.map(s =>
-          s.id === sequenceId
-            ? { ...s, scenes: s.scenes.map(sc => sc.id === sceneId ? { ...sc, isVisible: !sc.isVisible } : sc) }
-            : s
-        )
-      }
-    }));
-  }, [currentProjectId]);
+    // Toggle local state optimistically, logic implicitly handled in updateScene if we pass isVisible
+    // But the generic implementation:
+    const project = projects.find(p => p.id === currentProjectId);
+    const sequence = project?.sequences.find(s => s.id === sequenceId);
+    const scene = sequence?.scenes.find(s => s.id === sceneId);
+    if (scene) {
+      updateScene(sequenceId, sceneId, { isVisible: !scene.isVisible });
+    }
+  }, [projects, currentProjectId, updateScene]);
 
   // 6. Connections
   const addConnection = useCallback(async (fromId: string, toId: string, fromType: string, toType: string) => {
@@ -475,8 +502,8 @@ export function useProject() {
         project_id: currentProjectId,
         from_id: fromId,
         to_id: toId,
-        from_type: fromType,
-        to_type: toType
+        from_type: fromType, // Schema uses from_type
+        to_type: toType     // Schema uses to_type
       };
       const { error } = await supabase.from('connections').insert(newConn);
       if (error) throw error;
@@ -488,11 +515,11 @@ export function useProject() {
 
   const deleteConnection = useCallback(async (id: string) => {
     try {
-      await supabase.from('connections').delete().eq('id', id);
       setProjectsState(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
         return { ...p, connections: p.connections.filter(c => c.id !== id) };
       }));
+      await supabase.from('connections').delete().eq('id', id);
     } catch (e) { console.error(e); }
   }, [currentProjectId]);
 
@@ -504,8 +531,8 @@ export function useProject() {
         project_id: currentProjectId,
         name: prompt.name,
         prompt: prompt.prompt,
-        category: prompt.category,
-        image_url: prompt.imageUrl
+        category: prompt.category, // Schema uses category
+        image_url: prompt.imageUrl // Schema uses image_url
       };
       await supabase.from('prompts').insert(newPrompt);
       fetchProjects();
@@ -518,7 +545,10 @@ export function useProject() {
       if (updates.name) dbUpdates.name = updates.name;
       if (updates.prompt) dbUpdates.prompt = updates.prompt;
       if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
-      await supabase.from('prompts').update(dbUpdates).eq('id', id);
+      if (updates.category) dbUpdates.category = updates.category;
+
+      const { error } = await supabase.from('prompts').update(dbUpdates).eq('id', id);
+      if (error) throw error;
       fetchProjects();
     } catch (e) { }
   }, [fetchProjects]);
@@ -528,13 +558,113 @@ export function useProject() {
     fetchProjects();
   }, [fetchProjects]);
 
+  const addPromptCategory = useCallback((category: string) => {
+    if (currentProject && !currentProject.promptCategories?.includes(category)) {
+      updateProjectMeta(currentProject.id, {
+        promptCategories: [...(currentProject.promptCategories || []), category]
+      });
+    }
+  }, [currentProject, updateProjectMeta]);
+
+  const deletePromptCategory = useCallback(async (category: string) => {
+    if (!currentProject) return;
+
+    // 1. Update categories list
+    const newCategories = (currentProject.promptCategories || []).filter(c => c !== category);
+    updateProjectMeta(currentProject.id, { promptCategories: newCategories });
+
+    // 2. Delete prompts with this category
+    try {
+      const { error } = await supabase
+        .from('prompts')
+        .delete()
+        .eq('project_id', currentProject.id)
+        .eq('category', category);
+
+      if (error) throw error;
+      fetchProjects();
+    } catch (e) {
+      console.error("Error deleting prompt category", e);
+      toast.error("Erro ao deletar categoria");
+    }
+  }, [currentProject, updateProjectMeta, fetchProjects]);
+
   // Placeholder functions for now
-  const addPromptCategory = (c: string) => { };
-  const deletePromptCategory = (c: string) => { };
-  const duplicateSequence = (id: string) => { };
-  const addMoodBoardItem = (i: any) => { };
-  const updateMoodBoardItem = (id: string, u: any) => { };
-  const deleteMoodBoardItem = (id: string) => { };
+  // 8. Moodboard
+  const addMoodBoardItem = useCallback(async (item: MoodBoardItem) => {
+    if (!currentProjectId) return;
+    try {
+      const newItem = {
+        project_id: currentProjectId,
+        type: item.type,
+        content: item.content,
+        image_url: item.imageUrl,
+        color: item.color,
+        position: item.position,
+        width: item.width,
+        height: item.height,
+        rotation: item.rotation,
+        z_index: item.zIndex || 0
+      };
+      const { error } = await supabase.from('moodboard_items').insert(newItem);
+      if (error) throw error;
+      fetchProjects();
+    } catch (e) {
+      console.error("Error adding moodboard item", e);
+      toast.error("Erro ao salvar item no moodboard");
+    }
+  }, [currentProjectId, fetchProjects]);
+
+  const updateMoodBoardItem = useCallback(async (id: string, updates: Partial<MoodBoardItem>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.position) dbUpdates.position = updates.position;
+      if (updates.width) dbUpdates.width = updates.width;
+      if (updates.height) dbUpdates.height = updates.height;
+      if (updates.rotation) dbUpdates.rotation = updates.rotation;
+      if (updates.zIndex) dbUpdates.z_index = updates.zIndex;
+      if (updates.content) dbUpdates.content = updates.content;
+      if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
+      if (updates.color) dbUpdates.color = updates.color;
+
+      // Optimistic
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          moodboard: (p.moodboard || []).map(m => m.id === id ? { ...m, ...updates } : m)
+        };
+      }));
+
+      const { error } = await supabase.from('moodboard_items').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
+  }, [currentProjectId]);
+
+  const deleteMoodBoardItem = useCallback(async (id: string) => {
+    try {
+      // Optimistic
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          moodboard: (p.moodboard || []).filter(m => m.id !== id)
+        };
+      }));
+
+      const { error } = await supabase.from('moodboard_items').delete().eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      toast.error("Erro ao deletar item");
+    }
+  }, [currentProjectId]);
+
+  const duplicateSequence = useCallback(async (id: string) => {
+    // Implement duplication logic if needed later
+    console.log("Duplicate sequence not implemented for Supabase yet");
+  }, []);
   const undo = () => { };
   const redo = () => { };
   const canUndo = false;
