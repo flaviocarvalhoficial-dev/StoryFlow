@@ -127,16 +127,16 @@ export function Canvas({
     }
   };
 
-  const getCanvasDotColor = () => {
+  const getCanvasDotColor = (opacity = 0.1) => {
     switch (project.canvasBg) {
       case 'white':
       case 'light-gray':
-      case 'light': return 'rgba(0,0,0,0.1)';
+      case 'light': return `rgba(0,0,0,${opacity})`;
       case 'black':
       case 'dark-gray':
       case 'dark':
-      case 'medium': return 'rgba(255,255,255,0.1)';
-      default: return 'rgba(0,0,0,0.1)';
+      case 'medium': return `rgba(255,255,255,${opacity})`;
+      default: return `rgba(0,0,0,${opacity})`;
     }
   };
 
@@ -277,7 +277,7 @@ export function Canvas({
           backgroundImage: gridStyle === 'none' ? 'none' :
             gridStyle === 'dots'
               ? `radial-gradient(${getCanvasDotColor()} 1px, transparent 1px)`
-              : `linear-gradient(to right, ${getCanvasDotColor().replace('0.1', '0.05')} 1px, transparent 1px), linear-gradient(to bottom, ${getCanvasDotColor().replace('0.1', '0.05')} 1px, transparent 1px)`,
+              : `linear-gradient(to right, ${getCanvasDotColor(0.05)} 1px, transparent 1px), linear-gradient(to bottom, ${getCanvasDotColor(0.05)} 1px, transparent 1px)`,
           backgroundSize: '40px 40px',
           backgroundPosition: `${canvasState.panOffset.x}px ${canvasState.panOffset.y}px`,
         } as any}
@@ -444,7 +444,7 @@ export function Canvas({
       {/* Shortcuts Hints */}
       <div
         className="absolute bottom-4 left-4 z-10 pointer-events-none select-none flex items-center gap-4 text-[10px] font-medium transition-colors duration-300"
-        style={{ color: getCanvasDotColor().replace('0.1', '0.4') }}
+        style={{ color: getCanvasDotColor(0.4) }}
       >
         <span>Duplo Clique: Nova Sequência</span>
         <span>Alt + Scroll: Zoom</span>

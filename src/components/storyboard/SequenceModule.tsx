@@ -112,6 +112,14 @@ export function SequenceModule({
 
   const AspectIcon = aspectRatioIcons[sequence.aspectRatio] || RectangleHorizontal;
 
+  const getStackMargin = (ratio: AspectRatio) => {
+    switch (ratio) {
+      case '9:16': return "-mt-[350px]";
+      case '4:3': return "-mt-[130px]";
+      default: return "-mt-[90px]"; // 16:9
+    }
+  };
+
   const renderSceneWithChildren = (scene: SceneModule, isTopLevel = false, index = 0) => {
     const subscenes = (sequence.scenes || []).filter(s => s.parentId === scene.id && s.isVisible !== false);
     const isExpanded = scene.isExpanded !== false;
@@ -125,11 +133,7 @@ export function SequenceModule({
           isTopLevel && sequence.isCollapsed && (
             sequence.layoutDirection === 'horizontal'
               ? index === 0 ? "ml-0" : "-ml-[200px]"
-              : index === 0 ? "mt-0" : (
-                sequence.aspectRatio === '9:16' ? "-mt-[350px]" :
-                  sequence.aspectRatio === '4:3' ? "-mt-[130px]" :
-                    "-mt-[90px]"
-              )
+              : index === 0 ? "mt-0" : getStackMargin(sequence.aspectRatio)
           )
         )}
         style={isTopLevel && sequence.isCollapsed ? {
