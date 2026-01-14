@@ -51,6 +51,7 @@ interface SequenceModuleProps {
   onToggleSceneVisibility: (sceneId: string) => void;
   onAddSubscene: (sceneId: string) => void;
   onOpenViewer: () => void;
+  sceneBorderStyle?: 'solid' | 'none';
 }
 
 const aspectRatioIcons: Record<AspectRatio, React.ElementType> = {
@@ -78,6 +79,7 @@ export function SequenceModule({
   onToggleSceneVisibility,
   onAddSubscene,
   onOpenViewer,
+  sceneBorderStyle = 'solid',
 }: SequenceModuleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -196,7 +198,8 @@ export function SequenceModule({
                 <div
                   key={`stack-${i}`}
                   className={cn(
-                    "absolute border border-module-border/30 bg-secondary/30 rounded-md transition-all duration-300",
+                    "absolute bg-secondary/30 rounded-md transition-all duration-300",
+                    sceneBorderStyle === 'solid' && "border border-module-border/30",
                     isTopLevel ? "w-[220px]" : "w-[160px]",
                     "aspect-video" // fallback to video if no ratio is passed? No, aspect ratio is on Sequence.
                   )}
@@ -221,6 +224,7 @@ export function SequenceModule({
             aspectRatio={sequence.aspectRatio}
             onUpdate={(updates) => onUpdateScene(scene.id, updates)}
             onDelete={() => onDeleteScene(scene.id)}
+            borderStyle={sceneBorderStyle}
             onOpenNotes={() => onOpenNotes(scene.id)}
           />
 
@@ -302,8 +306,10 @@ export function SequenceModule({
         {/* Sequence Header Node - Icons Only */}
         <div
           className={cn(
-            "module min-w-[140px] bg-background border-2 relative z-20 group transition-all duration-200",
-            isSelected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"
+            "module min-w-[140px] bg-background relative z-20 group transition-all duration-200",
+            isSelected
+              ? "border-2 border-primary ring-2 ring-primary/20"
+              : cn(sceneBorderStyle === 'none' ? "border-0" : "border-2 border-border", "hover:border-primary/50")
           )}
         >
           <div className="flex items-center justify-between p-1.5">

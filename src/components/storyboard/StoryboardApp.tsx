@@ -13,7 +13,8 @@ import { ProjectLibraryView } from './ProjectLibraryView';
 import { MoodBoardView } from './MoodBoardView';
 import { SequenceViewer } from './SequenceViewer';
 import { ScriptSidebar } from './ScriptSidebar';
-import { PromptStyle } from '@/types/storyboard';
+import { UserProfileModal } from './UserProfileModal';
+import { PromptStyle, UserProfile } from '@/types/storyboard';
 import {
   Dialog,
   DialogContent,
@@ -32,42 +33,51 @@ export function StoryboardApp() {
     return 'canvas';
   });
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('storyflow_user_profile');
+    return saved ? JSON.parse(saved) : {
+      firstName: 'Flavio',
+      lastName: 'Carvalho',
+      email: 'flaviocarvalhoficial@gmail.com',
+      specialty: 'Filmmaker',
+      plan: 'Pro',
+      avatarUrl: ''
+    };
+  });
 
   // Interface Settings State
   const [sidebarFontSize, setSidebarFontSize] = useState<'01' | '02' | '03'>(() => {
-    const saved = localStorage.getItem('storyflow.sidebarFontSize');
-    return (saved as any) || '01';
+    return (localStorage.getItem('storyflow_sidebar_font_size') as '01' | '02' | '03') || '02';
   });
-
   const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'none'>(() => {
-    const saved = localStorage.getItem('storyflow.gridStyle');
-    return (saved as any) || 'dots';
+    const saved = localStorage.getItem('storyflow_grid_style');
+    return (saved as 'dots' | 'lines' | 'none') || 'dots';
   });
-
   const [connectionStyle, setConnectionStyle] = useState<'smooth' | 'straight'>(() => {
-    const saved = localStorage.getItem('storyflow.connectionStyle');
-    return (saved as any) || 'smooth';
+    const saved = localStorage.getItem('storyflow_connection_style');
+    return (saved as 'smooth' | 'straight') || 'smooth';
   });
 
   const [defaultRatio, setDefaultRatio] = useState<'16:9' | '9:16' | '4:3'>(() => {
-    const saved = localStorage.getItem('storyflow.defaultRatio');
-    return (saved as any) || '16:9';
+    const saved = localStorage.getItem('storyflow_default_ratio');
+    return (saved as '16:9' | '9:16' | '4:3') || '16:9';
   });
 
   useEffect(() => {
-    localStorage.setItem('storyflow.sidebarFontSize', sidebarFontSize);
+    localStorage.setItem('storyflow_sidebar_font_size', sidebarFontSize);
   }, [sidebarFontSize]);
 
   useEffect(() => {
-    localStorage.setItem('storyflow.gridStyle', gridStyle);
+    localStorage.setItem('storyflow_grid_style', gridStyle);
   }, [gridStyle]);
 
   useEffect(() => {
-    localStorage.setItem('storyflow.connectionStyle', connectionStyle);
+    localStorage.setItem('storyflow_connection_style', connectionStyle);
   }, [connectionStyle]);
 
   useEffect(() => {
-    localStorage.setItem('storyflow.defaultRatio', defaultRatio);
+    localStorage.setItem('storyflow_default_ratio', defaultRatio);
   }, [defaultRatio]);
 
   const [isScriptSidebarOpen, setIsScriptSidebarOpen] = useState(false);
@@ -276,10 +286,10 @@ export function StoryboardApp() {
         onFontSizeChange={setSidebarFontSize}
         gridStyle={gridStyle}
         onGridStyleChange={setGridStyle}
-        connectionStyle={connectionStyle}
-        onConnectionStyleChange={setConnectionStyle}
         defaultRatio={defaultRatio}
         onDefaultRatioChange={setDefaultRatio}
+        userProfile={userProfile}
+        onOpenProfile={() => setIsProfileOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -467,12 +477,18 @@ export function StoryboardApp() {
         </DialogContent>
       </Dialog>
 
-      {/* Sequence Viewer Integration */}
       <SequenceViewer
         sequence={viewerSequenceId ? currentProject.sequences.find(s => s.id === viewerSequenceId) || null : null}
         isOpen={!!viewerSequenceId}
         onClose={() => setViewerSequenceId(null)}
       />
+
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        onUpdateProfile={setUserProfile}
+      />
     </div>
   );
 }
+

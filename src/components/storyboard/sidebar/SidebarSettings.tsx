@@ -30,8 +30,6 @@ interface SidebarSettingsProps {
     onFontSizeChange: (size: '01' | '02' | '03') => void;
     gridStyle: 'dots' | 'lines' | 'none';
     onGridStyleChange: (style: 'dots' | 'lines' | 'none') => void;
-    connectionStyle: 'smooth' | 'straight';
-    onConnectionStyleChange: (style: 'smooth' | 'straight') => void;
     defaultRatio: '16:9' | '9:16' | '4:3';
     onDefaultRatioChange: (ratio: '16:9' | '9:16' | '4:3') => void;
     isDark: boolean;
@@ -45,8 +43,6 @@ export function SidebarSettings({
     onFontSizeChange,
     gridStyle,
     onGridStyleChange,
-    connectionStyle,
-    onConnectionStyleChange,
     defaultRatio,
     onDefaultRatioChange,
     isDark,
@@ -121,29 +117,6 @@ export function SidebarSettings({
                                                         gridStyle === item.id ? "bg-background shadow-sm shadow-black/5" : ""
                                                     )}
                                                     onClick={() => onGridStyleChange(item.id as any)}
-                                                >
-                                                    <item.icon className="w-3 h-3" />
-                                                    <span className="text-[10px] font-medium">{item.label}</span>
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] text-muted-foreground uppercase">Estilo de Conexão</Label>
-                                        <div className="flex bg-muted p-1 rounded-lg gap-1">
-                                            {[
-                                                { id: 'smooth', label: 'Curva', icon: Activity },
-                                                { id: 'straight', label: 'Reta', icon: Minus }
-                                            ].map((item) => (
-                                                <Button
-                                                    key={item.id}
-                                                    variant={connectionStyle === item.id ? 'secondary' : 'ghost'}
-                                                    className={cn(
-                                                        "flex-1 h-8 gap-2",
-                                                        connectionStyle === item.id ? "bg-background shadow-sm shadow-black/5" : ""
-                                                    )}
-                                                    onClick={() => onConnectionStyleChange(item.id as any)}
                                                 >
                                                     <item.icon className="w-3 h-3" />
                                                     <span className="text-[10px] font-medium">{item.label}</span>

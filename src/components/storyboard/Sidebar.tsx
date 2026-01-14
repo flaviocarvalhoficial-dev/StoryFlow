@@ -15,6 +15,7 @@ import { SidebarSettings } from './sidebar/SidebarSettings';
 import { SidebarUpgradeCard } from './sidebar/SidebarUpgradeCard';
 import { ProjectHierarchy } from './sidebar/ProjectHierarchy';
 import { PromptLibrary } from './sidebar/PromptLibrary';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface SidebarProps {
   projects: Project[];
@@ -51,10 +52,11 @@ interface SidebarProps {
   onFontSizeChange: (size: '01' | '02' | '03') => void;
   gridStyle: 'dots' | 'lines' | 'none';
   onGridStyleChange: (style: 'dots' | 'lines' | 'none') => void;
-  connectionStyle: 'smooth' | 'straight';
-  onConnectionStyleChange: (style: 'smooth' | 'straight') => void;
   defaultRatio: '16:9' | '9:16' | '4:3';
   onDefaultRatioChange: (ratio: '16:9' | '9:16' | '4:3') => void;
+  // User
+  userProfile?: { firstName: string; lastName: string; avatarUrl: string; plan: string }; // using simplified inline type or import
+  onOpenProfile?: () => void;
 }
 
 export function Sidebar({
@@ -90,10 +92,10 @@ export function Sidebar({
   onFontSizeChange,
   gridStyle,
   onGridStyleChange,
-  connectionStyle,
-  onConnectionStyleChange,
   defaultRatio,
   onDefaultRatioChange,
+  userProfile,
+  onOpenProfile,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHierarchyPinned, setIsHierarchyPinned] = useState(false);
@@ -273,6 +275,29 @@ export function Sidebar({
       </ScrollArea>
 
       <div className={cn("border-t border-sidebar-border p-2 space-y-1", isCollapsed && "px-0 flex flex-col items-center")}>
+        {onOpenProfile && (
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full justify-start h-12 px-2 hover:bg-sidebar-accent mb-2",
+              isCollapsed && "justify-center px-0 h-10 w-10 rounded-full"
+            )}
+            onClick={onOpenProfile}
+          >
+            <Avatar className="h-8 w-8 shrink-0 mr-2 border border-border">
+              <AvatarImage src={userProfile?.avatarUrl} className="object-cover" />
+              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                {userProfile?.firstName?.[0]}{userProfile?.lastName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            {!isCollapsed && (
+              <div className="flex flex-col items-start overflow-hidden">
+                <span className="text-sm font-medium truncate w-full text-left">{userProfile?.firstName} {userProfile?.lastName}</span>
+                <span className="text-[10px] text-muted-foreground truncate w-full text-left">{userProfile?.plan} Plan</span>
+              </div>
+            )}
+          </Button>
+        )}
         <SidebarUpgradeCard isCollapsed={isCollapsed} />
         <SidebarSettings
           isCollapsed={isCollapsed}
@@ -280,8 +305,6 @@ export function Sidebar({
           onFontSizeChange={onFontSizeChange}
           gridStyle={gridStyle}
           onGridStyleChange={onGridStyleChange}
-          connectionStyle={connectionStyle}
-          onConnectionStyleChange={onConnectionStyleChange}
           defaultRatio={defaultRatio}
           onDefaultRatioChange={onDefaultRatioChange}
           isDark={isDark}

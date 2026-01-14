@@ -30,6 +30,7 @@ interface CanvasProps {
   gridStyle: 'dots' | 'lines' | 'none';
   connectionStyle: 'smooth' | 'straight';
   defaultRatio: '16:9' | '9:16' | '4:3';
+  sceneBorderStyle: 'solid' | 'none';
 }
 
 export function Canvas({

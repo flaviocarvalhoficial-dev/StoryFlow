@@ -17,6 +17,7 @@ interface SceneCardProps {
   onDelete: () => void;
   onOpenNotes: () => void;
   isSmall?: boolean;
+  borderStyle?: 'solid' | 'none';
 }
 
 const aspectRatioClasses: Record<AspectRatio, string> = {
@@ -32,6 +33,7 @@ export function SceneCard({
   onDelete,
   onOpenNotes,
   isSmall = false,
+  borderStyle = 'solid',
 }: SceneCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -85,13 +87,21 @@ export function SceneCard({
   return (
     <div
       className={cn(
-        "group relative bg-secondary/50 border border-module-border rounded-md overflow-hidden no-drag shadow-sm transition-all hover:shadow-md",
+        "group relative bg-secondary/50 rounded-md overflow-hidden no-drag transition-all hover:shadow-md",
+        borderStyle === 'solid' ? "border border-module-border shadow-sm" : "border-0 shadow-none",
         isSmall ? "w-[160px]" : "w-[220px]"
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      style={{
+        borderWidth: borderStyle === 'none' ? 0 : undefined,
+        boxShadow: borderStyle === 'none' ? 'none' : undefined
+      }}
     >
-      <div className="flex items-center gap-2 p-2.5 border-b border-module-border/50 bg-background/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 transition-opacity duration-200 opacity-0 group-hover:opacity-100">
+      <div className={cn(
+        "flex items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 transition-opacity duration-200 opacity-0 group-hover:opacity-100",
+        borderStyle === 'solid' && "border-b border-module-border/50"
+      )}>
         <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
         {isEditing ? (
           <input

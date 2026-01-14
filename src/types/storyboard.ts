@@ -107,3 +107,12 @@ export interface CanvasState {
   selectedId: string | null;
   selectedType: 'sequence' | 'scene' | null;
 }
+
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  specialty: string;
+  plan: string;
+  avatarUrl: string;
+}
