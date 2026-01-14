@@ -55,9 +55,14 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile }: UserProfi
     }, []);
 
     const handleSave = () => {
-        localStorage.setItem('storyflow_user_profile', JSON.stringify(profile));
-        if (onUpdateProfile) onUpdateProfile(profile);
-        onClose();
+        try {
+            localStorage.setItem('storyflow_user_profile', JSON.stringify(profile));
+            if (onUpdateProfile) onUpdateProfile(profile);
+            onClose();
+        } catch (e) {
+            console.error("Failed to save profile", e);
+            alert("Não foi possível salvar a imagem. Tente uma imagem menor.");
+        }
     };
 
     const handleSignOut = async () => {
@@ -65,15 +70,48 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile }: UserProfi
         onClose();
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = e.target?.result as string;
-                setProfile(prev => ({ ...prev, avatarUrl: result }));
-            };
-            reader.readAsDataURL(file);
+            try {
+                // Resize and compress image to avoid LocalStorage quota limits
+                const compressedImage = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target?.result as string;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const maxSize = 300; // Max dimension
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > maxSize) {
+                                    height *= maxSize / width;
+                                    width = maxSize;
+                                }
+                            } else {
+                                if (height > maxSize) {
+                                    width *= maxSize / height;
+                                    height = maxSize;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        };
+                    };
+                });
+
+                setProfile(prev => ({ ...prev, avatarUrl: compressedImage }));
+            } catch (error) {
+                console.error("Error processing image", error);
+            }
         }
     };
 

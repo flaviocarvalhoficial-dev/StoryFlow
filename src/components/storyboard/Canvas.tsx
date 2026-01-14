@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 interface CanvasProps {
   project: Project;
   onAddSequence: (position: Position, aspectRatio?: '16:9' | '9:16' | '4:3') => void;
-  onUpdateSequence: (id: string, updates: Partial<SequenceType>, saveHistory?: boolean) => void;
+  onUpdateSequence: (id: string, updates: Partial<SequenceType>, saveHistory?: boolean, previousStateOverride?: any) => void;
   onDeleteSequence: (id: string) => void;
   onToggleCollapseSequence: (id: string) => void;
   onAddScene: (sequenceId: string, position: Position) => void;
@@ -59,6 +59,7 @@ export function Canvas({
 }: CanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const dragStartPositions = useRef<Record<string, Position>>({});
   const {
     canvasState,
     handleWheel,
@@ -141,6 +142,9 @@ export function Canvas({
     }
   };
 
+  /* State for tracking drag positions locally to avoid excessive DB updates */
+  const [tempPositions, setTempPositions] = useState<Record<string, Position>>({});
+
   const [guides, setGuides] = useState<{ x: number | null, y: number | null }>({ x: null, y: null });
 
   const handleSequenceDrag = (id: string, newPos: Position) => {
@@ -164,7 +168,8 @@ export function Canvas({
     });
 
     setGuides({ x: guideX, y: guideY });
-    onUpdateSequence(id, { position: { x: snappedX, y: snappedY } }, false);
+    // Update local temp state only - much faster!
+    setTempPositions(prev => ({ ...prev, [id]: { x: snappedX, y: snappedY } }));
   };
 
   return (
@@ -315,23 +320,31 @@ export function Canvas({
 
               if (!fromSequence || !toSequence) return null;
 
+              // Use temp positions for connections if available
+              const getEffectivePosition = (seq: any) => tempPositions[seq.id] || seq.position;
+
               const getPos = (seq: any, id: string, type: string) => {
+                const pos = getEffectivePosition(seq);
+                // Need to reconstruct relative offsets based on effective position 'pos'
+                // But detailed offsets rely on iterating scenes.
+                // For now, assume connections might lag slightly or calculate derived pos:
+
                 if (type === 'sequence') {
                   return {
-                    x: seq.position.x + 200,
-                    y: seq.position.y + 25
+                    x: pos.x + 200,
+                    y: pos.y + 25
                   };
                 }
                 const sceneIdx = seq.scenes.findIndex((s: any) => s.id === id);
-                if (sceneIdx === -1) return seq.position;
+                if (sceneIdx === -1) return pos;
 
                 if (seq.layoutDirection === 'horizontal') {
-                  const x = seq.position.x + 200 + 40 + (sceneIdx * (220 + 32)) + 110;
-                  const y = seq.position.y + 100;
+                  const x = pos.x + 200 + 40 + (sceneIdx * (220 + 32)) + 110;
+                  const y = pos.y + 100;
                   return { x, y };
                 } else {
-                  const x = seq.position.x + 100;
-                  const y = seq.position.y + 50 + 40 + (sceneIdx * (150 + 32)) + 75;
+                  const x = pos.x + 100;
+                  const y = pos.y + 50 + 40 + (sceneIdx * (150 + 32)) + 75;
                   return { x, y };
                 }
               };
@@ -352,31 +365,60 @@ export function Canvas({
           </svg>
 
           {/* Sequence modules */}
-          {(project.sequences || []).filter(s => s.isVisible !== false).map(sequence => (
-            <SequenceModule
-              key={sequence.id}
-              sequence={sequence}
-              isSelected={canvasState.selectedId === sequence.id}
-              zoom={canvasState.zoom}
-              onSelect={() => select(sequence.id, 'sequence')}
-              onUpdatePosition={(pos) => handleSequenceDrag(sequence.id, pos)}
-              onDragEnd={() => {
-                setGuides({ x: null, y: null });
-                onUpdateSequence(sequence.id, { position: sequence.position }, true);
-              }}
-              onUpdateSequence={(updates) => onUpdateSequence(sequence.id, updates)}
-              onDelete={() => onDeleteSequence(sequence.id)}
-              onToggleCollapse={() => onToggleCollapseSequence(sequence.id)}
-              onAddScene={() => onAddScene(sequence.id, { x: 0, y: 0 })}
-              onUpdateScene={(sceneId, updates) => onUpdateScene(sequence.id, sceneId, updates)}
-              onDeleteScene={(sceneId) => onDeleteScene(sequence.id, sceneId)}
-              onOpenContext={() => onOpenContext(sequence.id)}
-              onOpenNotes={(sceneId) => onOpenNotes(sequence.id, sceneId)}
-              onToggleSceneVisibility={(sceneId) => onToggleSceneVisibility(sequence.id, sceneId)}
-              onAddSubscene={(sceneId) => onAddSubscene(sequence.id, sceneId)}
-              onOpenViewer={() => onOpenViewer(sequence.id)}
-            />
-          ))}
+          {(project.sequences || []).filter(s => s.isVisible !== false).map(sequence => {
+            // Override position if currently dragging
+            const isDragging = !!tempPositions[sequence.id];
+            const displaySequence = isDragging
+              ? { ...sequence, position: tempPositions[sequence.id] }
+              : sequence;
+
+            return (
+              <SequenceModule
+                key={sequence.id}
+                sequence={displaySequence}
+                isSelected={canvasState.selectedId === sequence.id}
+                zoom={canvasState.zoom}
+                onSelect={() => select(sequence.id, 'sequence')}
+                onUpdatePosition={(pos) => handleSequenceDrag(sequence.id, pos)}
+                onDragStart={() => {
+                  dragStartPositions.current[sequence.id] = { ...sequence.position };
+                }}
+                onDragEnd={() => {
+                  setGuides({ x: null, y: null });
+                  const startPos = dragStartPositions.current[sequence.id];
+                  const finalPos = tempPositions[sequence.id];
+
+                  if (finalPos) {
+                    onUpdateSequence(
+                      sequence.id,
+                      { position: finalPos },
+                      true,
+                      startPos ? { position: startPos } : undefined
+                    );
+                    // Clear temp state
+                    setTempPositions(prev => {
+                      const next = { ...prev };
+                      delete next[sequence.id];
+                      return next;
+                    });
+                  }
+
+                  delete dragStartPositions.current[sequence.id];
+                }}
+                onUpdateSequence={(updates) => onUpdateSequence(sequence.id, updates)}
+                onDelete={() => onDeleteSequence(sequence.id)}
+                onToggleCollapse={() => onToggleCollapseSequence(sequence.id)}
+                onAddScene={() => onAddScene(sequence.id, { x: 0, y: 0 })}
+                onUpdateScene={(sceneId, updates) => onUpdateScene(sequence.id, sceneId, updates)}
+                onDeleteScene={(sceneId) => onDeleteScene(sequence.id, sceneId)}
+                onOpenContext={() => onOpenContext(sequence.id)}
+                onOpenNotes={(sceneId) => onOpenNotes(sequence.id, sceneId)}
+                onToggleSceneVisibility={(sceneId) => onToggleSceneVisibility(sequence.id, sceneId)}
+                onAddSubscene={(sceneId) => onAddSubscene(sequence.id, sceneId)}
+                onOpenViewer={() => onOpenViewer(sequence.id)}
+              />
+            )
+          })}
 
           {/* Add button on double click */}
           {showAddButton && (

@@ -92,6 +92,7 @@ const TAG_COLORS = [
 
 interface ProjectLibraryViewProps {
     projects: Project[];
+    currentProjectId?: string;
     onSelectProject: (id: string) => void;
     onCreateProject: (name: string, initialData?: Partial<Project>) => void;
     onDeleteProject: (id: string) => void;
@@ -267,6 +268,7 @@ function TagSelectorCell({
 
 export function ProjectLibraryView({
     projects,
+    currentProjectId,
     onSelectProject,
     onCreateProject,
     onDeleteProject,
@@ -843,209 +845,225 @@ export function ProjectLibraryView({
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredProjects.map((project) => (
-                                <div
-                                    key={project.id}
-                                    className="group relative flex flex-col bg-card border border-border/40 hover:border-primary/50 rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                                    onClick={() => onSelectProject(project.id)}
-                                >
-                                    {/* Project Cover */}
+                            {filteredProjects.map((project) => {
+                                const isSelected = project.id === currentProjectId;
+                                return (
                                     <div
-                                        className="h-40 bg-gradient-to-br from-primary/5 via-background to-secondary/5 relative overflow-hidden group-hover:from-primary/10 group-hover:to-secondary/10 transition-colors"
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            e.currentTarget.classList.add('border-primary', 'bg-primary/5');
-                                        }}
-                                        onDragLeave={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                                            const file = e.dataTransfer.files?.[0];
-                                            if (file) handleImageUpload(file, project.id);
-                                        }}
-                                    >
-                                        {project.coverImage ? (
-                                            <div className="absolute inset-0">
-                                                <img
-                                                    src={project.coverImage}
-                                                    alt={project.name}
-                                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                                />
-                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                                            </div>
-                                        ) : (
-                                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] group-hover:opacity-[0.06] transition-opacity top-4">
-                                                <FileText className="w-32 h-32" />
-                                            </div>
+                                        key={project.id}
+                                        className={cn(
+                                            "group relative flex flex-col bg-card rounded-xl overflow-hidden transition-all duration-300 cursor-pointer",
+                                            isSelected
+                                                ? "border-2 border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] ring-2 ring-primary/20 scale-[1.02]"
+                                                : "border border-border/40 hover:border-primary/50 shadow-sm hover:shadow-lg hover:-translate-y-1"
                                         )}
-
-                                        {/* Upload Overlay */}
-                                        <label
-                                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
-                                            onClick={(e) => e.stopPropagation()}
+                                        style={isSelected ? {
+                                            boxShadow: '0 0 15px 2px rgba(var(--primary-rgb, 59, 130, 246), 0.4)'
+                                        } : undefined}
+                                        onClick={() => onSelectProject(project.id)}
+                                    >
+                                        {/* Project Cover */}
+                                        <div
+                                            className="h-40 bg-gradient-to-br from-primary/5 via-background to-secondary/5 relative overflow-hidden group-hover:from-primary/10 group-hover:to-secondary/10 transition-colors"
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                e.currentTarget.classList.add('border-primary', 'bg-primary/5');
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                                                const file = e.dataTransfer.files?.[0];
+                                                if (file) handleImageUpload(file, project.id);
+                                            }}
                                         >
-                                            <Upload className="w-8 h-8 text-white mb-2" />
-                                            <span className="text-xs text-white font-medium">Alterar Capa</span>
-                                            <input
-                                                type="file"
-                                                className="hidden"
-                                                accept="image/*"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) handleImageUpload(file, project.id);
-                                                }}
-                                            />
-                                        </label>
-
-                                        {/* Actions Menu (Top Right) */}
-                                        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm bg-background/80 backdrop-blur-sm hover:bg-background">
-                                                        <MoreHorizontal className="w-4 h-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem onClick={() => onSelectProject(project.id)} className="cursor-pointer">
-                                                        <ExternalLink className="w-4 h-4 mr-2" /> Abrir no Canvas
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleEditProject(project)} className="cursor-pointer">
-                                                        <Edit className="w-4 h-4 mr-2" /> Editar Projeto
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer" onClick={() => onDeleteProject(project.id)}>
-                                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir Projeto
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-
-                                        {/* Status / Date Badge (Top Left) */}
-                                        <div className="absolute top-3 left-3 flex gap-2">
-                                            <div className="px-2.5 py-1 rounded-full bg-background/60 backdrop-blur-md border border-border/50 text-[10px] font-medium text-muted-foreground flex items-center gap-1.5 shadow-sm">
-                                                <CalendarIcon className="w-3 h-3" />
-                                                {formatDate(project.updatedAt)}
-                                            </div>
-                                            {project.deadline && (
-                                                <div className={cn(
-                                                    "px-2.5 py-1 rounded-full backdrop-blur-md border text-[10px] font-medium flex items-center gap-1.5 shadow-sm",
-                                                    new Date(project.deadline) < new Date() ? "bg-red-500/80 border-red-400 text-white" : "bg-background/60 border-border/50 text-muted-foreground"
-                                                )}>
-                                                    <Clock className="w-3 h-3" />
-                                                    {new Date(project.deadline).toLocaleDateString('pt-BR')}
+                                            {project.coverImage ? (
+                                                <div className="absolute inset-0">
+                                                    <img
+                                                        src={project.coverImage}
+                                                        alt={project.name}
+                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                                                </div>
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] group-hover:opacity-[0.06] transition-opacity top-4">
+                                                    <FileText className="w-32 h-32" />
                                                 </div>
                                             )}
-                                        </div>
-                                    </div>
 
-                                    {/* Card Body */}
-                                    <div className="flex flex-col flex-1 p-5 gap-4">
-                                        {/* Title & Desc */}
-                                        <div className="space-y-2">
-                                            <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                                                {project.name}
-                                            </h3>
-                                            <p className="text-sm text-muted-foreground line-clamp-2 h-10 leading-relaxed">
-                                                {project.description || "Sem descrição..."}
-                                            </p>
-                                        </div>
+                                            {/* Upload Overlay */}
+                                            <label
+                                                className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Upload className="w-8 h-8 text-white mb-2" />
+                                                <span className="text-xs text-white font-medium">Alterar Capa</span>
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleImageUpload(file, project.id);
+                                                    }}
+                                                />
+                                            </label>
 
-                                        {/* Progress Section */}
-                                        <div className="space-y-2 pt-2 border-t border-border/40" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center justify-between text-xs">
-                                                <span className="font-medium text-muted-foreground flex items-center gap-1.5">
-                                                    <ListTodo className="w-3.5 h-3.5" />
-                                                    Etapas ({project.checklist?.filter(s => s.completed).length || 0}/{project.checklist?.length || 0})
-                                                </span>
-                                                <span className="font-bold text-primary">{project.progress}%</span>
-                                            </div>
-                                            <Progress value={project.progress} className="h-1.5 bg-muted" />
-
-                                            {/* Checklist Dropdown - Simplified for Card */}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-6 px-2 text-[10px] text-muted-foreground hover:text-primary w-full justify-between mt-1">
-                                                        <span>Gerenciar etapas</span>
-                                                        <ChevronRight className="w-3 h-3" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent className="w-72 p-0 bg-popover/95 backdrop-blur-md border-border shadow-xl z-50">
-                                                    <div className="p-3 border-b border-border/50 flex items-center justify-between bg-muted/30">
-                                                        <span className="text-xs font-bold uppercase tracking-wider text-foreground">Etapas do Projeto</span>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-6 w-6 hover:bg-background rounded-full"
-                                                            onClick={() => {
-                                                                const label = prompt('Nome da nova etapa:');
-                                                                if (label) {
-                                                                    const newStep = { id: Math.random().toString(36).substr(2, 9), label, completed: false };
-                                                                    onUpdateProject(project.id, { checklist: [...(project.checklist || []), newStep] });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Plus className="w-3.5 h-3.5" />
+                                            {/* Actions Menu (Top Right) */}
+                                            <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm bg-background/80 backdrop-blur-sm hover:bg-background">
+                                                            <MoreHorizontal className="w-4 h-4" />
                                                         </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-48">
+                                                        <DropdownMenuItem onClick={() => onSelectProject(project.id)} className="cursor-pointer">
+                                                            <ExternalLink className="w-4 h-4 mr-2" /> Abrir no Canvas
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleEditProject(project)} className="cursor-pointer">
+                                                            <Edit className="w-4 h-4 mr-2" /> Editar Projeto
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer" onClick={() => onDeleteProject(project.id)}>
+                                                            <Trash2 className="w-4 h-4 mr-2" /> Excluir Projeto
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+
+                                            {/* Status / Date Badge (Top Left) */}
+                                            <div className="absolute top-3 left-3 flex gap-2">
+                                                <div className="px-2.5 py-1 rounded-full bg-background/60 backdrop-blur-md border border-border/50 text-[10px] font-medium text-muted-foreground flex items-center gap-1.5 shadow-sm">
+                                                    <CalendarIcon className="w-3 h-3" />
+                                                    {formatDate(project.updatedAt)}
+                                                </div>
+                                                {project.deadline && (
+                                                    <div className={cn(
+                                                        "px-2.5 py-1 rounded-full backdrop-blur-md border text-[10px] font-medium flex items-center gap-1.5 shadow-sm",
+                                                        new Date(project.deadline) < new Date() ? "bg-red-500/80 border-red-400 text-white" : "bg-background/60 border-border/50 text-muted-foreground"
+                                                    )}>
+                                                        <Clock className="w-3 h-3" />
+                                                        {new Date(project.deadline).toLocaleDateString('pt-BR')}
                                                     </div>
-                                                    <ScrollArea className="max-h-[250px] overflow-y-auto">
-                                                        <div className="p-2 space-y-1">
-                                                            {project.checklist?.map((step) => (
-                                                                <div key={step.id} className="flex items-start gap-2 p-2 hover:bg-muted/50 rounded-md group/step transition-colors">
-                                                                    <Checkbox
-                                                                        checked={step.completed}
-                                                                        onCheckedChange={(checked) => {
-                                                                            const updatedChecklist = project.checklist.map(s =>
-                                                                                s.id === step.id ? { ...s, completed: !!checked } : s
-                                                                            );
-                                                                            onUpdateProject(project.id, { checklist: updatedChecklist });
-                                                                        }}
-                                                                        className="mt-0.5"
-                                                                    />
-                                                                    <span className={cn("text-xs flex-1 pt-0.5", step.completed && "line-through text-muted-foreground opacity-70")}>
-                                                                        {step.label}
-                                                                    </span>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-5 w-5 -mt-0.5 opacity-0 group-hover/step:opacity-100 hover:text-destructive hover:bg-destructive/10 rounded-full"
-                                                                        onClick={() => {
-                                                                            const updatedChecklist = project.checklist.filter(s => s.id !== step.id);
-                                                                            onUpdateProject(project.id, { checklist: updatedChecklist });
-                                                                        }}
-                                                                    >
-                                                                        <X className="w-3 h-3" />
-                                                                    </Button>
-                                                                </div>
-                                                            ))}
-                                                            {!project.checklist?.length && (
-                                                                <p className="text-center py-4 text-xs text-muted-foreground">Nenhuma etapa.</p>
-                                                            )}
-                                                        </div>
-                                                    </ScrollArea>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        {/* Footer: Tags */}
-                                        <div className="mt-auto pt-3 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                                            <TagSelectorCell
-                                                projectTags={project.tags || []}
-                                                allProjects={projects}
-                                                onSelect={(tag) => {
-                                                    const currentTags = project.tags || [];
-                                                    const otherTags = currentTags.filter(t => t.id !== tag.id);
-                                                    onUpdateProject(project.id, { tags: [tag, ...otherTags] });
-                                                }}
-                                            />
+                                        {/* Card Body */}
+                                        <div className="flex flex-col flex-1 p-5 gap-4">
+                                            {/* Title & Desc */}
+                                            <div className="space-y-2">
+                                                <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                                                    {project.name}
+                                                </h3>
+                                                <p className="text-sm text-muted-foreground line-clamp-2 h-10 leading-relaxed">
+                                                    {project.description || "Sem descrição..."}
+                                                </p>
+                                            </div>
+
+                                            {/* Progress Section */}
+                                            <div className="space-y-2 pt-2 border-t border-border/40">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="font-medium text-muted-foreground flex items-center gap-1.5">
+                                                        <ListTodo className="w-3.5 h-3.5" />
+                                                        Etapas ({project.checklist?.filter(s => s.completed).length || 0}/{project.checklist?.length || 0})
+                                                    </span>
+                                                    <span className="font-bold text-primary">{project.progress}%</span>
+                                                </div>
+                                                <Progress value={project.progress} className="h-1.5 bg-muted" />
+
+                                                {/* Checklist Dropdown - Simplified for Card */}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-6 px-2 text-[10px] text-muted-foreground hover:text-primary w-full justify-between mt-1" onClick={(e) => e.stopPropagation()}>
+                                                            <span>Gerenciar etapas</span>
+                                                            <ChevronRight className="w-3 h-3" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent className="w-72 p-0 bg-popover/95 backdrop-blur-md border-border shadow-xl z-50">
+                                                        <div className="p-3 border-b border-border/50 flex items-center justify-between bg-muted/30">
+                                                            <span className="text-xs font-bold uppercase tracking-wider text-foreground">Etapas do Projeto</span>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-6 w-6 hover:bg-background rounded-full"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation(); // Prevent bubbling
+                                                                    const label = prompt('Nome da nova etapa:');
+                                                                    if (label) {
+                                                                        const newStep = { id: Math.random().toString(36).substr(2, 9), label, completed: false };
+                                                                        onUpdateProject(project.id, { checklist: [...(project.checklist || []), newStep] });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Plus className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                        <ScrollArea className="max-h-[250px] overflow-y-auto">
+                                                            <div className="p-2 space-y-1">
+                                                                {project.checklist?.map((step) => (
+                                                                    <div key={step.id} className="flex items-start gap-2 p-2 hover:bg-muted/50 rounded-md group/step transition-colors">
+                                                                        <Checkbox
+                                                                            checked={step.completed}
+                                                                            onCheckedChange={(checked) => {
+                                                                                const updatedChecklist = project.checklist.map(s =>
+                                                                                    s.id === step.id ? { ...s, completed: !!checked } : s
+                                                                                );
+                                                                                onUpdateProject(project.id, { checklist: updatedChecklist });
+                                                                            }}
+                                                                            className="mt-0.5"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        />
+                                                                        <span className={cn("text-xs flex-1 pt-0.5", step.completed && "line-through text-muted-foreground opacity-70")}>
+                                                                            {step.label}
+                                                                        </span>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-5 w-5 -mt-0.5 opacity-0 group-hover/step:opacity-100 hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const updatedChecklist = project.checklist.filter(s => s.id !== step.id);
+                                                                                onUpdateProject(project.id, { checklist: updatedChecklist });
+                                                                            }}
+                                                                        >
+                                                                            <X className="w-3 h-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                                {!project.checklist?.length && (
+                                                                    <p className="text-center py-4 text-xs text-muted-foreground">Nenhuma etapa.</p>
+                                                                )}
+                                                            </div>
+                                                        </ScrollArea>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+
+                                            {/* Footer: Tags */}
+                                            <div className="mt-auto pt-3 flex items-center justify-between">
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <TagSelectorCell
+                                                        projectTags={project.tags || []}
+                                                        allProjects={projects}
+                                                        onSelect={(tag) => {
+                                                            const currentTags = project.tags || [];
+                                                            const otherTags = currentTags.filter(t => t.id !== tag.id);
+                                                            onUpdateProject(project.id, { tags: [tag, ...otherTags] });
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

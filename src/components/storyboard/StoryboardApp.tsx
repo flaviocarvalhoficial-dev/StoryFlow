@@ -69,6 +69,10 @@ export function StoryboardApp() {
   }, [sidebarFontSize]);
 
   useEffect(() => {
+    localStorage.setItem('storyflow_user_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
+
+  useEffect(() => {
     localStorage.setItem('storyflow_grid_style', gridStyle);
   }, [gridStyle]);
 
@@ -344,6 +348,7 @@ export function StoryboardApp() {
       ) : currentView === 'projects' ? (
         <ProjectLibraryView
           projects={projects}
+          currentProjectId={currentProjectId}
           onSelectProject={(id) => {
             setCurrentProjectId(id);
             setCurrentView('canvas');
