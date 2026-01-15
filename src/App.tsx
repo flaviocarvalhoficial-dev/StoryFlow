@@ -1,8 +1,10 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
@@ -35,15 +37,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
             <Routes>
+              <Route path="/" element={<Landing />} />
               <Route path="/login" element={<AuthPage />} />
               <Route
-                path="/"
+                path="/app"
                 element={
                   <ProtectedRoute>
                     <Index />
@@ -54,11 +57,11 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
-  </ErrorBoundary>
+  </ErrorBoundary >
 );
 
 export default App;

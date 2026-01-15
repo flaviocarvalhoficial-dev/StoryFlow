@@ -25,43 +25,30 @@ export interface UserProfile {
 interface UserProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onUpdateProfile?: (profile: UserProfile) => void;
+    onUpdateProfile: (profile: UserProfile) => void;
+    currentProfile: UserProfile;
 }
 
-export function UserProfileModal({ isOpen, onClose, onUpdateProfile }: UserProfileModalProps) {
+export function UserProfileModal({ isOpen, onClose, onUpdateProfile, currentProfile }: UserProfileModalProps) {
     const { signOut } = useAuth();
-    const [profile, setProfile] = useState<UserProfile>({
-        firstName: 'Flavio',
-        lastName: 'Carvalho',
-        email: 'flaviocarvalhoficial@gmail.com',
-        specialty: 'Filmmaker',
-        plan: 'Pro',
-        avatarUrl: ''
-    });
+    const [profile, setProfile] = useState<UserProfile>(currentProfile);
+
+    // Update local state when modal opens or currentProfile changes
+    useEffect(() => {
+        if (isOpen) {
+            setProfile(currentProfile);
+        }
+    }, [isOpen, currentProfile]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Load from localStorage on mount
-    useEffect(() => {
-        const saved = localStorage.getItem('storyflow_user_profile');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                setProfile(prev => ({ ...prev, ...parsed }));
-            } catch (e) {
-                console.error("Failed to parse user profile", e);
-            }
-        }
-    }, []);
-
     const handleSave = () => {
         try {
-            localStorage.setItem('storyflow_user_profile', JSON.stringify(profile));
-            if (onUpdateProfile) onUpdateProfile(profile);
+            onUpdateProfile(profile);
             onClose();
         } catch (e) {
             console.error("Failed to save profile", e);
-            alert("Não foi possível salvar a imagem. Tente uma imagem menor.");
+            alert("Erro ao salvar perfil.");
         }
     };
 
@@ -127,7 +114,7 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile }: UserProfi
                     <div className="flex flex-col items-center gap-3">
                         <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                             <Avatar className="w-24 h-24 border-2 border-border group-hover:border-primary transition-colors">
-                                <AvatarImage src={profile.avatarUrl} objectFit="cover" />
+                                <AvatarImage src={profile.avatarUrl} className="object-cover" />
                                 <AvatarFallback className="text-2xl bg-muted">
                                     {profile.firstName[0]}{profile.lastName[0]}
                                 </AvatarFallback>

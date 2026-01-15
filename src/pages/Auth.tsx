@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ export default function AuthPage() {
 
     useEffect(() => {
         if (session) {
-            navigate('/', { replace: true });
+            navigate('/app', { replace: true });
         }
     }, [session, navigate]);
 

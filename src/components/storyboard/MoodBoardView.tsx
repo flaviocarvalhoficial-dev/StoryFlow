@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MoodBoardItem, Position } from '@/types/storyboard';
 import { cn } from '@/lib/utils';
-import { X, ZoomIn, ZoomOut, Move, Trash2, Copy, Scissors, ClipboardPaste, BringToFront } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Move, Trash2, Copy, Scissors, ClipboardPaste, BringToFront, Undo2, Redo2, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     ContextMenu,
@@ -19,9 +19,13 @@ interface MoodBoardViewProps {
     onUpdateItem: (id: string, updates: Partial<MoodBoardItem>) => void;
     onDeleteItem: (id: string) => void;
     projectId: string;
+    onUndo: () => void;
+    onRedo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
 }
 
-export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, projectId }: MoodBoardViewProps) {
+export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, projectId, onUndo, onRedo, canUndo, canRedo }: MoodBoardViewProps) {
     // Initialize state from localStorage if available
     const [zoom, setZoom] = useState(() => {
         const saved = localStorage.getItem(`moodboard_zoom_${projectId}`);
@@ -80,7 +84,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                 }
 
                 onAddItem({
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                     type: 'image',
                     content: base64,
                     position: {
@@ -129,7 +133,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                         // Add with slight offset or center
                         onAddItem({
                             ...item,
-                            id: Math.random().toString(36).substr(2, 9),
+                            id: crypto.randomUUID(),
                             position: {
                                 x: item.position.x + 20,
                                 y: item.position.y + 20
@@ -190,11 +194,45 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                     setSelectedId(null);
                 }
             }
+
+            // Undo (Ctrl+Z)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (canUndo) onUndo();
+            }
+
+            // Redo (Ctrl+Y or Ctrl+Shift+Z)
+            if (
+                ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+                ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+            ) {
+                e.preventDefault();
+                if (canRedo) onRedo();
+            }
+
+            // Zoom In (Ctrl + =)
+            if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+                e.preventDefault();
+                setZoom(z => Math.min(z * 1.2, 5));
+            }
+
+            // Zoom Out (Ctrl + -)
+            if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                e.preventDefault();
+                setZoom(z => Math.max(z / 1.2, 0.1));
+            }
+
+            // Reset Zoom (Ctrl + 0)
+            if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                e.preventDefault();
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedId, items, handleCopy, handlePasteFromMenu, onDeleteItem]);
+    }, [selectedId, items, handleCopy, handlePasteFromMenu, onDeleteItem, canUndo, canRedo, onUndo, onRedo]);
 
     // Handle image pasting (CTRL+V event listener - backup/global)
     useEffect(() => {
@@ -281,10 +319,27 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
     const handleItemMouseDown = (e: React.MouseEvent, id: string, position: Position) => {
         e.stopPropagation();
         if (e.button === 0) {
-            setDraggingId(id);
-            setSelectedId(id);
-            dragStartPos.current = { x: e.clientX, y: e.clientY };
-            itemStartPos.current = { ...position };
+            if (e.altKey) {
+                const itemToDuplicate = items.find(i => i.id === id);
+                if (itemToDuplicate) {
+                    const newId = crypto.randomUUID();
+                    const newItem = {
+                        ...itemToDuplicate,
+                        id: newId,
+                        zIndex: (items.length || 0) + 1
+                    };
+                    onAddItem(newItem);
+                    setDraggingId(newId);
+                    setSelectedId(newId);
+                    dragStartPos.current = { x: e.clientX, y: e.clientY };
+                    itemStartPos.current = { ...position };
+                }
+            } else {
+                setDraggingId(id);
+                setSelectedId(id);
+                dragStartPos.current = { x: e.clientX, y: e.clientY };
+                itemStartPos.current = { ...position };
+            }
         }
     };
 
@@ -375,10 +430,67 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                         backgroundPosition: `${pan.x}px ${pan.y}px`
                     }}
                 >
-                    <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur-md p-3 rounded-lg text-white/70 pointer-events-none select-none shadow-lg border border-white/5">
+                    {/* Toolbar (Top Right) */}
+                    <div className="absolute top-4 right-4 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-md rounded-lg p-1 border border-white/10 shadow-lg">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn("h-8 w-8 text-white/70 hover:text-white hover:bg-white/10", !canUndo && "opacity-30 cursor-not-allowed")}
+                            onClick={() => canUndo && onUndo()}
+                            disabled={!canUndo}
+                            title="Desfazer (Ctrl+Z)"
+                        >
+                            <Undo2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn("h-8 w-8 text-white/70 hover:text-white hover:bg-white/10", !canRedo && "opacity-30 cursor-not-allowed")}
+                            onClick={() => canRedo && onRedo()}
+                            disabled={!canRedo}
+                            title="Refazer (Ctrl+Y)"
+                        >
+                            <Redo2 className="w-4 h-4" />
+                        </Button>
+                        <div className="w-px h-5 bg-white/10" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                            onClick={() => setZoom(z => Math.min(z * 1.2, 5))}
+                            title="Zoom In (Ctrl +)"
+                        >
+                            <ZoomIn className="w-4 h-4" />
+                        </Button>
+                        <span className="text-xs text-white/50 min-w-[40px] text-center select-none">
+                            {Math.round(zoom * 100)}%
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                            onClick={() => setZoom(z => Math.max(z / 1.2, 0.1))}
+                            title="Zoom Out (Ctrl -)"
+                        >
+                            <ZoomOut className="w-4 h-4" />
+                        </Button>
+                        <div className="w-px h-5 bg-white/10" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                            onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+                            title="Resetar Zoom (Ctrl+0)"
+                        >
+                            <Maximize className="w-4 h-4" />
+                        </Button>
+                    </div>
+
+                    {/* Info Box (Moved to Bottom Left) */}
+                    <div className="absolute bottom-4 left-4 z-50 bg-black/50 backdrop-blur-md p-3 rounded-lg text-white/70 pointer-events-none select-none shadow-lg border border-white/5">
                         <h2 className="text-base font-semibold text-white mb-1">MoodBoard Infinito</h2>
                         <p className="text-[10px] leading-tight opacity-80">Botão Direito: Menu de Contexto</p>
-                        <p className="text-[10px] leading-tight opacity-80">CTRL+V também funciona</p>
+                        <p className="text-[10px] leading-tight opacity-80">ALT+Drag: Duplicar item</p>
                         <p className="text-[10px] leading-tight opacity-80">Scroll para navegar (CTRL+Scroll para zoom)</p>
                     </div>
 

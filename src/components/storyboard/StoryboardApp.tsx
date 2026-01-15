@@ -54,7 +54,7 @@ export function StoryboardApp() {
 
   // Interface Settings State
   const [sidebarFontSize, setSidebarFontSize] = useState<'01' | '02' | '03'>(() => {
-    return (localStorage.getItem('storyflow_sidebar_font_size') as '01' | '02' | '03') || '02';
+    return (localStorage.getItem('storyflow_sidebar_font_size') as '01' | '02' | '03') || '01';
   });
   const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'none'>(() => {
     const saved = localStorage.getItem('storyflow_grid_style');
@@ -113,6 +113,7 @@ export function StoryboardApp() {
     projects,
     currentProject,
     currentProjectId,
+    isLoading, // Destructure isLoading
     setCurrentProjectId,
     createProject,
     deleteProject,
@@ -222,11 +223,11 @@ export function StoryboardApp() {
   };
 
   const currentSequence = contextModal.sequenceId
-    ? currentProject.sequences?.find(s => s.id === contextModal.sequenceId)
+    ? currentProject?.sequences?.find(s => s.id === contextModal.sequenceId)
     : null;
 
   const currentScene = notesModal.sequenceId && notesModal.sceneId
-    ? currentProject.sequences?.find(s => s.id === notesModal.sequenceId)
+    ? currentProject?.sequences?.find(s => s.id === notesModal.sequenceId)
       ?.scenes.find(sc => sc.id === notesModal.sceneId)
     : null;
 
@@ -234,7 +235,7 @@ export function StoryboardApp() {
     let startY = 100;
     const padding = 400;
 
-    if (currentProject.sequences.length > 0) {
+    if (currentProject?.sequences && currentProject.sequences.length > 0) {
       const maxY = Math.max(...currentProject.sequences.map(s => s.position.y));
       startY = maxY + padding;
     }
@@ -257,7 +258,7 @@ export function StoryboardApp() {
   };
 
   const handleUpdateScriptScene = (sceneId: string, isCompleted: boolean) => {
-    if (!currentProject.structuredScript) return;
+    if (!currentProject?.structuredScript) return;
 
     const updatedScript = currentProject.structuredScript.map(scene =>
       scene.id === sceneId ? { ...scene, isCompleted } : scene
@@ -289,7 +290,7 @@ export function StoryboardApp() {
         onToggleTheme={() => setIsDark(!isDark)}
         onOpenAssets={() => setCurrentView('moodboard')}
         onOpenReferences={() => setReferencesWindow(true)}
-        promptCategories={currentProject.promptCategories || []}
+        promptCategories={currentProject?.promptCategories || []}
         onAddPromptCategory={addPromptCategory}
         onDeletePromptCategory={deletePromptCategory}
         currentView={currentView}
@@ -310,7 +311,7 @@ export function StoryboardApp() {
 
       {/* Main Content Area */}
       {currentView === 'canvas' ? (
-        (!currentProject || (currentProject as any).id === 'loading' || !currentProject.sequences) ? (
+        (isLoading || !currentProject) ? (
           <div className="flex-1 flex items-center justify-center bg-background">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
             <span className="ml-2 text-muted-foreground">Carregando projeto...</span>
@@ -368,6 +369,7 @@ export function StoryboardApp() {
           onDeletePrompt={deletePrompt}
           onUpdatePromptCategory={updatePromptCategory}
           onDeletePromptCategory={deletePromptCategory}
+          projectId={currentProject.id}
         />
       ) : currentView === 'projects' ? (
         <ProjectLibraryView
@@ -388,6 +390,10 @@ export function StoryboardApp() {
           onUpdateItem={updateMoodBoardItem}
           onDeleteItem={deleteMoodBoardItem}
           projectId={currentProject.id}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
       )}
 
@@ -517,6 +523,7 @@ export function StoryboardApp() {
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         onUpdateProfile={setUserProfile}
+        currentProfile={userProfile}
       />
     </div>
   );

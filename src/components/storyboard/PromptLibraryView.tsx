@@ -25,6 +25,7 @@ interface PromptLibraryViewProps {
     categories?: string[];
     onSelectCategory?: (category: string) => void;
     prompts: PromptStyle[];
+    projectId: string; // Needed for local storage keys
     onAddPrompt: () => void;
     onEditPrompt: (prompt: PromptStyle) => void;
     onUpdatePrompt: (id: string, updates: Partial<PromptStyle>) => void;
@@ -42,11 +43,64 @@ export function PromptLibraryView({
     onEditPrompt,
     onUpdatePrompt,
     onDeletePrompt,
+    onUpdatePromptCategory,
+    onDeletePromptCategory,
+    projectId,
 }: PromptLibraryViewProps) {
     const isOverview = category === 'Tudo';
     const [renameCategoryOpen, setRenameCategoryOpen] = useState(false);
     const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
     const [newName, setNewName] = useState('');
+
+    const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+    const [categoryForCover, setCategoryForCover] = useState<string | null>(null);
+    const [coverUrl, setCoverUrl] = useState('');
+
+    // Load covers from localStorage
+    const getStoredCovers = () => {
+        try {
+            const saved = localStorage.getItem(`storyflow_category_covers_${projectId}`);
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    };
+
+    const [covers, setCovers] = useState<Record<string, string>>(getStoredCovers());
+
+    const updateCover = (cat: string, url: string) => {
+        const newCovers = { ...covers, [cat]: url };
+        setCovers(newCovers);
+        localStorage.setItem(`storyflow_category_covers_${projectId}`, JSON.stringify(newCovers));
+    };
+
+    const handleCoverClick = (cat: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCategoryForCover(cat);
+        setCoverUrl(covers[cat] || '');
+        setCoverDialogOpen(true);
+    };
+
+    const handleCoverSubmit = () => {
+        if (categoryForCover) {
+            updateCover(categoryForCover, coverUrl);
+            setCoverDialogOpen(false);
+            setCategoryForCover(null);
+            setCoverUrl('');
+        }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const result = ev.target?.result as string;
+                setCoverUrl(result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleRenameClick = (cat: string, e?: React.MouseEvent) => {
         e?.stopPropagation();
@@ -64,9 +118,22 @@ export function PromptLibraryView({
     };
 
     const handleDeleteClick = (cat: string, e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
-        if (confirm(`Tem certeza que deseja excluir a categoria "${cat}" e todos os seus prompts?`)) {
-            onDeletePromptCategory?.(cat);
+
+        // Debugging log
+        console.log("Attempting to delete category:", cat);
+
+        // Use a slight timeout to ensure UI isn't blocking, though not strictly necessary usually
+        if (window.confirm(`Tem certeza que deseja excluir a categoria "${cat}" e todos os seus prompts?`)) {
+            if (onDeletePromptCategory) {
+                onDeletePromptCategory(cat).catch(err => {
+                    console.error("Failed to delete category:", err);
+                    alert("Erro ao excluir categoria.");
+                });
+            } else {
+                console.error("onDeletePromptCategory function is missing!");
+            }
         }
     };
 
@@ -96,12 +163,17 @@ export function PromptLibraryView({
                                     key={cat}
                                     onClick={() => onSelectCategory?.(cat)}
                                     onDoubleClick={(e) => handleRenameClick(cat, e)}
-                                    className="group aspect-[3/2] bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02] relative"
+                                    className="group aspect-[3/2] bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02] relative overflow-hidden"
                                 >
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-50" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
                                                     <MoreVertical className="w-4 h-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
@@ -110,7 +182,7 @@ export function PromptLibraryView({
                                                     <Pencil className="w-4 h-4 mr-2" />
                                                     Renomear
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); alert('Funcionalidade de capa em desenvolvimento'); }}>
+                                                <DropdownMenuItem onClick={(e) => handleCoverClick(cat, e)}>
                                                     <ImageIcon className="w-4 h-4 mr-2" />
                                                     Imagem de Capa
                                                 </DropdownMenuItem>
@@ -122,12 +194,29 @@ export function PromptLibraryView({
                                         </DropdownMenu>
                                     </div>
 
-                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                                        <FolderOpen className="w-6 h-6 text-primary" />
+                                    <div className="absolute inset-0 z-0">
+                                        {covers[cat] ? (
+                                            <img
+                                                src={covers[cat]}
+                                                alt={cat}
+                                                className="w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center opacity-10">
+                                                <FolderOpen className="w-16 h-16" />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="text-center">
-                                        <h3 className="font-semibold text-lg">{cat}</h3>
-                                        <p className="text-sm text-muted-foreground">{count} prompts</p>
+                                    <div className="relative z-10 flex flex-col items-center gap-4">
+                                        {!covers[cat] && (
+                                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors backdrop-blur-sm">
+                                                <FolderOpen className="w-6 h-6 text-primary" />
+                                            </div>
+                                        )}
+                                        <div className="text-center">
+                                            <h3 className="font-semibold text-lg shadow-black drop-shadow-md">{cat}</h3>
+                                            <p className="text-sm text-muted-foreground font-medium drop-shadow-md">{count} prompts</p>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -187,6 +276,65 @@ export function PromptLibraryView({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                <Dialog open={coverDialogOpen} onOpenChange={setCoverDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Imagem de Capa</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="flex flex-col gap-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="coverUrl" className="text-right">
+                                        URL da Imagem
+                                    </Label>
+                                    <Input
+                                        id="coverUrl"
+                                        value={coverUrl}
+                                        onChange={(e) => setCoverUrl(e.target.value)}
+                                        className="col-span-3"
+                                        placeholder="https://"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="coverFile" className="text-right">
+                                        Ou Upload
+                                    </Label>
+                                    <Input
+                                        id="coverFile"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileUpload}
+                                        className="col-span-3 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                            {coverUrl && (
+                                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-border bg-muted relative group">
+                                    <img src={coverUrl} alt="Preview" className="w-full h-full object-cover" />
+                                    <Button
+                                        variant="destructive"
+                                        size="icon"
+                                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => setCoverUrl('')}
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setCoverDialogOpen(false)}>Cancelar</Button>
+                            <Button onClick={handleCoverSubmit}>Salvar</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <div className="border-t border-border p-2 text-center bg-card/50 backdrop-blur-sm">
+                    <p className="text-[10px] text-muted-foreground">
+                        Organize seus prompts em categorias. Use o menu (⋮) nos cards para personalizar capas, renomear ou excluir grupos.
+                    </p>
+                </div>
             </div>
         );
     }
@@ -257,6 +405,12 @@ export function PromptLibraryView({
                         ))}
                     </div>
                 )}
+            </div>
+
+            <div className="border-t border-border p-2 text-center bg-card/50 backdrop-blur-sm">
+                <p className="text-[10px] text-muted-foreground">
+                    Gerencie sua biblioteca de estilos. Adicione prompts e referências visuais para manter a consistência estética do seu projeto.
+                </p>
             </div>
         </div>
     );

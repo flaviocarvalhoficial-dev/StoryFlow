@@ -24,6 +24,8 @@ export function useProject() {
     }
   }, [currentProjectId]);
 
+
+
   // Fetch projects list (Lightweight)
   const fetchProjects = useCallback(async () => {
     if (!user) return;
@@ -88,6 +90,13 @@ export function useProject() {
       setIsLoading(false);
     }
   }, [user]); // Removed currentProjectId
+
+  // Initial fetch when user is available
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user, fetchProjects]);
 
   // Fetch full details for a single project
   const fetchProjectDetails = useCallback(async (projectId: string) => {
@@ -172,6 +181,9 @@ export function useProject() {
 
     } catch (e) {
       console.error("Error loading project details", e);
+      toast.error('Erro ao carregar detalhes do projeto.');
+    } finally {
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -182,13 +194,7 @@ export function useProject() {
   // Lazy load details when project selected
   useEffect(() => {
     if (currentProjectId) {
-      // Optimization: check if sequences are empty? 
-      // But what if it's a new project with 0 sequences?
-      // We can check a flag or just fetch. Fetching single project is cheap.
-      // Let's check if we have data to avoid loop if possible, or naive fetch.
-      // For robustness against "empty project" being confused with "not loaded", 
-      // we might ideally have a `_loaded` flag. 
-      // Given constraints, we'll fetch every time we switch project ID, which is reasonable behavior (refresh data).
+      setIsLoading(true); // Set loading immediately on ID change before fetch starts
       fetchProjectDetails(currentProjectId);
     }
   }, [currentProjectId, fetchProjectDetails]);
@@ -1029,8 +1035,16 @@ export function useProject() {
 
   // Placeholder functions for now
   // 8. Moodboard
-  const addMoodBoardItem = useCallback(async (item: MoodBoardItem) => {
+  const addMoodBoardItem = useCallback(async (item: MoodBoardItem, trackHistory = true) => {
     if (!currentProjectId) return;
+
+    // 1. History
+    if (trackHistory) {
+      addToHistory({
+        undo: async () => deleteMoodBoardItem(item.id, false),
+        redo: async () => addMoodBoardItem(item, false)
+      });
+    }
 
     // Optimistic Update
     setProjectsState(prev => prev.map(p => {
@@ -1043,6 +1057,7 @@ export function useProject() {
 
     try {
       const newItem = {
+        id: item.id, // Use the generated UUID
         project_id: currentProjectId,
         type: item.type,
         content: item.content,
@@ -1054,11 +1069,24 @@ export function useProject() {
         rotation: item.rotation,
         z_index: item.zIndex || 0
       };
-      const { error } = await supabase.from('moodboard_items').insert(newItem);
+
+      const { data, error } = await supabase.from('moodboard_items').insert(newItem).select().single();
       if (error) throw error;
 
-      // No need to fetch if optimistic is correct, or fetch details:
-      // fetchProjectDetails(currentProjectId);
+      // If we used a valid UUID, the returned ID should match.
+      // If Supabase ignored it (unlikely if valid UUID), we update state.
+      if (data && data.id !== item.id) {
+        console.warn("Database returned different ID than generated", data.id, item.id);
+        // Update state to match DB
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            moodboard: (p.moodboard || []).map(m => m.id === item.id ? { ...m, id: data.id } : m)
+          };
+        }));
+      }
+
     } catch (e) {
       console.error("Error adding moodboard item", e);
       toast.error("Erro ao salvar item no moodboard");
@@ -1071,10 +1099,29 @@ export function useProject() {
         };
       }));
     }
-  }, [currentProjectId]); // Removed fetchProjects dependency
+  }, [currentProjectId]); // Dependency on deleteMoodBoardItem? Use function reference or move definition.
 
-  const updateMoodBoardItem = useCallback(async (id: string, updates: Partial<MoodBoardItem>) => {
+  const updateMoodBoardItem = useCallback(async (id: string, updates: Partial<MoodBoardItem>, trackHistory = true) => {
     try {
+      // 1. History
+      if (trackHistory && currentProjectId) {
+        const project = projects.find(p => p.id === currentProjectId);
+        const item = project?.moodboard?.find(i => i.id === id);
+        if (item) {
+          // Create a snapshot of the properties being updated
+          const previousState: Partial<MoodBoardItem> = {};
+          (Object.keys(updates) as Array<keyof MoodBoardItem>).forEach(key => {
+            // @ts-ignore
+            previousState[key] = item[key];
+          });
+
+          addToHistory({
+            undo: async () => updateMoodBoardItem(id, previousState, false),
+            redo: async () => updateMoodBoardItem(id, updates, false)
+          });
+        }
+      }
+
       const dbUpdates: any = {};
       if (updates.position) dbUpdates.position = updates.position;
       if (updates.width) dbUpdates.width = updates.width;
@@ -1099,10 +1146,22 @@ export function useProject() {
     } catch (e) {
       console.error(e);
     }
-  }, [currentProjectId]);
+  }, [currentProjectId, projects]);
 
-  const deleteMoodBoardItem = useCallback(async (id: string) => {
+  const deleteMoodBoardItem = useCallback(async (id: string, trackHistory = true) => {
     try {
+      // 1. History
+      if (trackHistory && currentProjectId) {
+        const project = projects.find(p => p.id === currentProjectId);
+        const item = project?.moodboard?.find(i => i.id === id);
+        if (item) {
+          addToHistory({
+            undo: async () => addMoodBoardItem(item, false),
+            redo: async () => deleteMoodBoardItem(id, false)
+          });
+        }
+      }
+
       // Optimistic
       setProjectsState(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
@@ -1117,7 +1176,7 @@ export function useProject() {
     } catch (e) {
       toast.error("Erro ao deletar item");
     }
-  }, [currentProjectId]);
+  }, [currentProjectId, projects]);
 
   const duplicateSequence = useCallback(async (id: string) => {
     // Implement duplication logic if needed later
@@ -1136,6 +1195,7 @@ export function useProject() {
       promptCategories: []
     } as any,
     currentProjectId,
+    isLoading, // Expose loading state
     setCurrentProjectId: setCurrentProjectIdState,
     createProject,
     deleteProject,
