@@ -1099,7 +1099,14 @@ export function useProject() {
 
   return {
     projects,
-    currentProject: currentProject || { id: 'loading' } as any,
+    currentProject: currentProject || {
+      id: 'loading',
+      sequences: [],
+      connections: [],
+      prompts: [],
+      moodboard: [],
+      promptCategories: []
+    } as any,
     currentProjectId,
     setCurrentProjectId: setCurrentProjectIdState,
     createProject,

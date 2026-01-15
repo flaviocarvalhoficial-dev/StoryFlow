@@ -5,7 +5,7 @@ import { StoryContextModal } from './StoryContextModal';
 import { NotesModal } from './NotesModal';
 import { FloatingWindow } from './FloatingWindow';
 import { useProject } from '@/hooks/useProject';
-import { ImageIcon, FileText, Upload, Plus, Palette } from 'lucide-react';
+import { ImageIcon, FileText, Upload, Plus, Palette, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PromptLibraryView } from './PromptLibraryView';
@@ -26,7 +26,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
 export function StoryboardApp() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('storyflow_theme');
+      return saved === 'dark';
+    }
+    return false;
+  });
   const [currentView, setCurrentView] = useState<'canvas' | 'prompts' | 'projects' | 'moodboard'>(() => {
     const saved = localStorage.getItem('storyflow_projects');
     if (!saved || JSON.parse(saved).length === 0) return 'projects';
@@ -177,6 +183,8 @@ export function StoryboardApp() {
   };
 
   useEffect(() => {
+    localStorage.setItem('storyflow_theme', isDark ? 'dark' : 'light');
+
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
@@ -213,12 +221,11 @@ export function StoryboardApp() {
   };
 
   const currentSequence = contextModal.sequenceId
-    ? currentProject.sequences.find(s => s.id === contextModal.sequenceId)
+    ? currentProject.sequences?.find(s => s.id === contextModal.sequenceId)
     : null;
 
   const currentScene = notesModal.sequenceId && notesModal.sceneId
-    ? currentProject.sequences
-      .find(s => s.id === notesModal.sequenceId)
+    ? currentProject.sequences?.find(s => s.id === notesModal.sequenceId)
       ?.scenes.find(sc => sc.id === notesModal.sceneId)
     : null;
 
@@ -236,7 +243,11 @@ export function StoryboardApp() {
   };
 
   const handleAddSubscene = (sequenceId: string, sceneId: string) => {
-    addScene(sequenceId, { x: 0, y: 0 }, sceneId, true);
+    addScene(sequenceId, { position: { x: 0, y: 0 }, parentId: sceneId, isSubscene: true });
+  };
+
+  const handleAddSceneToCanvas = (sequenceId: string, position: { x: number; y: number }) => {
+    addScene(sequenceId, { position });
   };
 
   const handleSwitchToCategory = (category: string) => {
@@ -298,38 +309,46 @@ export function StoryboardApp() {
 
       {/* Main Content Area */}
       {currentView === 'canvas' ? (
-        <div className="flex-1 relative flex overflow-hidden">
-          <Canvas
-            project={currentProject}
-            onAddSequence={addSequence}
-            onUpdateSequence={updateSequence}
-            onDeleteSequence={deleteSequence}
-            onToggleCollapseSequence={toggleCollapseSequence}
-            onAddScene={addScene}
-            onUpdateScene={updateScene}
-            onDeleteScene={deleteScene}
-            onOpenContext={handleOpenContext}
-            onOpenNotes={handleOpenNotes}
-            onSetCanvasBg={setCanvasBg}
-            onToggleSequenceVisibility={toggleSequenceVisibility}
-            onToggleSceneVisibility={toggleSceneVisibility}
-            onUndo={undo}
-            onRedo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onAddSubscene={handleAddSubscene}
-            onOpenViewer={setViewerSequenceId}
-            gridStyle={gridStyle}
-            connectionStyle={connectionStyle}
-            defaultRatio={defaultRatio}
-          />
-          <ScriptSidebar
-            project={currentProject}
-            isOpen={isScriptSidebarOpen}
-            onToggle={() => setIsScriptSidebarOpen(!isScriptSidebarOpen)}
-            onUpdateSceneStatus={handleUpdateScriptScene}
-          />
-        </div>
+        (!currentProject || (currentProject as any).id === 'loading' || !currentProject.sequences) ? (
+          <div className="flex-1 flex items-center justify-center bg-background">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Carregando projeto...</span>
+          </div>
+        ) : (
+          <div className="flex-1 relative flex overflow-hidden">
+            <Canvas
+              project={currentProject}
+              onAddSequence={addSequence}
+              onUpdateSequence={updateSequence}
+              onDeleteSequence={deleteSequence}
+              onToggleCollapseSequence={toggleCollapseSequence}
+              onAddScene={handleAddSceneToCanvas}
+              onUpdateScene={updateScene}
+              onDeleteScene={deleteScene}
+              onOpenContext={handleOpenContext}
+              onOpenNotes={handleOpenNotes}
+              onSetCanvasBg={setCanvasBg}
+              onToggleSequenceVisibility={toggleSequenceVisibility}
+              onToggleSceneVisibility={toggleSceneVisibility}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onAddSubscene={handleAddSubscene}
+              onOpenViewer={setViewerSequenceId}
+              gridStyle={gridStyle}
+              connectionStyle={connectionStyle}
+              defaultRatio={defaultRatio}
+              sceneBorderStyle="solid"
+            />
+            <ScriptSidebar
+              project={currentProject}
+              isOpen={isScriptSidebarOpen}
+              onToggle={() => setIsScriptSidebarOpen(!isScriptSidebarOpen)}
+              onUpdateSceneStatus={handleUpdateScriptScene}
+            />
+          </div>
+        )
       ) : currentView === 'prompts' ? (
         <PromptLibraryView
           category={activeCategory}

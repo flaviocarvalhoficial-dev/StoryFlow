@@ -99,6 +99,8 @@ export interface MoodBoardItem {
   height: number;
   rotation?: number;
   zIndex?: number;
+  imageUrl?: string;
+  color?: string;
 }
 
 export interface CanvasState {

@@ -312,6 +312,7 @@ export function Sidebar({
           fontStyles={fs}
         />
       </div>
-    </div >
+    </div>
+
   );
 }
