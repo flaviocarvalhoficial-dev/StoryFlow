@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Layers,
   Plus,
@@ -98,19 +98,28 @@ function SequenceModuleComponent({
     onSelect();
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  useEffect(() => {
     if (!isDragging) return;
-    const newX = (e.clientX - dragStart.current.x) / zoom;
-    const newY = (e.clientY - dragStart.current.y) / zoom;
-    onUpdatePosition({ x: newX, y: newY });
-  };
 
-  const handleMouseUp = () => {
-    if (isDragging) {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const newX = (e.clientX - dragStart.current.x) / zoom;
+      const newY = (e.clientY - dragStart.current.y) / zoom;
+      onUpdatePosition({ x: newX, y: newY });
+    };
+
+    const handleWindowMouseUp = () => {
       setIsDragging(false);
       onDragEnd?.();
-    }
-  };
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [isDragging, zoom, onUpdatePosition, onDragEnd]);
 
   const AspectIcon = aspectRatioIcons[sequence.aspectRatio] || RectangleHorizontal;
 
@@ -274,9 +283,6 @@ function SequenceModuleComponent({
         top: sequence.position.y,
       }}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
     >
       {/* Wrapper to ensure vertical stacking of title and module */}
       <div className="flex flex-col">

@@ -457,6 +457,15 @@ export function useProject() {
         }
       }
 
+      // 1. Optimistic Update (UI First)
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          sequences: p.sequences.map(s => s.id === id ? { ...s, ...updates } : s)
+        }
+      }));
+
       const dbUpdates: any = {};
       if (updates.title) dbUpdates.title = updates.title;
       if (updates.storyContext !== undefined) dbUpdates.story_context = updates.storyContext;
@@ -471,17 +480,21 @@ export function useProject() {
       const { error } = await supabase.from('sequences').update(dbUpdates).eq('id', id);
       if (error) throw error;
 
-      setProjectsState(prev => prev.map(p => {
-        if (p.id !== currentProjectId) return p;
-        return {
-          ...p,
-          sequences: p.sequences.map(s => s.id === id ? { ...s, ...updates } : s)
-        }
-      }));
-    } catch (error) {
-      console.error(error);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao atualizar sequência');
+      // Rollback Optimistic Update
+      if (currentProjectId) {
+        // We need the original state.
+        // Since we don't have it easily here without fetching or closure, we might be stuck.
+        // However, History captured it as `relevantPrev`!
+        // Wait, `relevantPrev` is only defined inside the `if(trackHistory)` block.
+        // A simple rollback would be to fetch from DB again to ensure consistency, 
+        // OR we could capture `originalSequence` at the start of value.
+        fetchProjectDetails(currentProjectId); // Force sync on error
+      }
     }
-  }, [currentProjectId, projects]); // Added projects dependency for snapshot
+  }, [currentProjectId, projects, fetchProjectDetails]); // Added projects dependency for snapshot
 
   const deleteSequence = useCallback(async (id: string, trackHistory = true) => {
     // 0. Preliminary Check & Capture State
