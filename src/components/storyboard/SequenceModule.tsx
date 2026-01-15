@@ -60,7 +60,7 @@ const aspectRatioIcons: Record<AspectRatio, React.ElementType> = {
   '9:16': RectangleVertical,
 };
 
-export function SequenceModule({
+function SequenceModuleComponent({
   sequence,
   isSelected,
   zoom,
@@ -519,3 +519,17 @@ export function SequenceModule({
     </div>
   );
 }
+
+export const SequenceModule = React.memo(SequenceModuleComponent, (prev, next) => {
+  // Custom comparison to ignore function props which change every render
+  // Compare structural props that affect rendering
+  if (prev.sequence !== next.sequence) return false;
+  if (prev.isSelected !== next.isSelected) return false;
+  if (prev.zoom !== next.zoom) return false;
+  if (prev.sceneBorderStyle !== next.sceneBorderStyle) return false;
+
+  // Functions are ignored in comparison as they are assumed to be stable in intent
+  return true;
+});
+
+

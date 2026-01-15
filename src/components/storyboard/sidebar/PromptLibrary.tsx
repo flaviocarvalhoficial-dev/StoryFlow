@@ -100,13 +100,12 @@ export function PromptLibrary({
                                 currentView === 'prompts' ? "bg-primary/10 text-primary hover:bg-primary/20 shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                                 fs.label
                             )}
-                            onClick={() => onViewChange('prompts')}
                         >
                             <div className="flex items-center gap-2">
                                 <Palette className={cn(fs.icon, "mr-3", currentView === 'prompts' && "text-primary")} />
                                 <span className="font-medium tracking-tight">Prompts</span>
                             </div>
-                            <ChevronRight className={cn("w-3.5 h-3.5 transition-transform duration-200 group-data-[state=open]:rotate-90 opacity-40")} />
+                            <ChevronRight className={cn("w-3.5 h-3.5 transition-transform duration-200 opacity-40", promptsOpen && "rotate-90")} />
                         </Button>
                     </CollapsibleTrigger>
                 </div>

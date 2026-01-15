@@ -24,7 +24,7 @@ export function useProject() {
     }
   }, [currentProjectId]);
 
-  // Fetch projects from Supabase
+  // Fetch projects list (Lightweight)
   const fetchProjects = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
@@ -33,13 +33,6 @@ export function useProject() {
         .from('projects')
         .select(`
           *,
-          sequences (
-            *,
-            scenes (*)
-          ),
-          connections (*),
-          prompts (*),
-          moodboard_items (*),
           project_tags (*),
           checklist_steps (*)
         `)
@@ -48,69 +41,45 @@ export function useProject() {
       if (error) throw error;
 
       if (data) {
-        const mappedProjects: Project[] = data.map((p: any) => ({
-          ...p,
-          createdAt: new Date(p.created_at),
-          updatedAt: new Date(p.updated_at),
-          canvasBg: p.canvas_bg,
-          coverImage: p.cover_image,
-          scriptMode: p.script_mode,
-          structuredScript: p.structured_script,
-          sequences: (p.sequences || []).map((s: any) => ({
-            ...s,
-            id: s.id,
-            title: s.title,
-            storyContext: s.story_context,
-            isCollapsed: s.is_collapsed,
-            aspectRatio: s.aspect_ratio,
-            layoutDirection: s.layout_direction,
-            scenesSpacing: s.scenes_spacing,
-            isVisible: s.is_visible !== false, // default true
-            position: { x: s.position_x || 0, y: s.position_y || 0 }, // Map x/y to position object
-            scenes: (s.scenes || []).map((sc: any) => ({
-              ...sc,
-              imageUrl: sc.image_url,
-              parentId: sc.parent_id,
-              isExpanded: sc.is_expanded,
-              isSubscene: sc.is_subscene,
-              aspectRatio: sc.aspect_ratio,
-              // Map scene position if it uses x/y cols, or keep if JSONB.
-              // Assuming JSONB 'position' based on addScene code, but to be safe:
-              position: sc.position || { x: sc.position_x || 0, y: sc.position_y || 0 }
-            })).sort((a: any, b: any) => {
-              // Sort scenes by creation date or position if available
-              if (a.position?.y !== b.position?.y) return (a.position?.y || 0) - (b.position?.y || 0);
-              if (a.position?.x !== b.position?.x) return (a.position?.x || 0) - (b.position?.x || 0);
-              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-            })
-          })),
-          connections: (p.connections || []).map((c: any) => ({
-            ...c,
-            fromId: c.from_id,
-            toId: c.to_id,
-            fromType: c.from_type,
-            toType: c.to_type
-          })),
-          prompts: (p.prompts || []).map((pr: any) => ({
-            ...pr,
-            imageUrl: pr.image_url
-          })),
-          moodboard: (p.moodboard_items || []).map((m: any) => ({
-            ...m,
-            imageUrl: m.image_url
-          })),
-          tags: p.project_tags || [],
-          checklist: p.checklist_steps || [],
-          promptCategories: p.prompt_categories || []
-        }));
-        setProjectsState(mappedProjects);
+        setProjectsState(prev => {
+          // Merge strategy: Keep existing details if project exists in state, update metadata
+          const currentMap = new Map(prev.map(p => [p.id, p]));
 
-        // If current project not in list, select first
-        if (currentProjectId && !mappedProjects.find(p => p.id === currentProjectId)) {
-          setCurrentProjectIdState(mappedProjects[0]?.id || '');
-        } else if (!currentProjectId && mappedProjects.length > 0) {
-          setCurrentProjectIdState(mappedProjects[0].id);
-        }
+          return data.map((p: any) => {
+            const existing = currentMap.get(p.id);
+
+            // Base Project Data
+            const baseData = {
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              status: p.status,
+              progress: p.progress,
+              createdAt: new Date(p.created_at),
+              updatedAt: new Date(p.updated_at),
+              canvasBg: p.canvas_bg,
+              coverImage: p.cover_image,
+              scriptMode: p.script_mode,
+              structuredScript: p.structured_script,
+              user_id: p.user_id,
+              tags: p.project_tags || [],
+              checklist: p.checklist_steps || [],
+              promptCategories: p.prompt_categories || [],
+            };
+
+            // Preserve loaded heavy data if it exists, otherwise initialize empty
+            return {
+              ...baseData,
+              sequences: existing?.sequences || [],
+              connections: existing?.connections || [],
+              prompts: existing?.prompts || [],
+              moodboard: existing?.moodboard || [],
+            } as Project;
+          });
+        });
+
+        // Initial selection logic relies on state; might need adjusting if state update is async, 
+        // but useEffect below handles currentProjectId changes.
       }
     } catch (error: any) {
       console.error('Error fetching projects:', error);
@@ -118,11 +87,111 @@ export function useProject() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, currentProjectId]);
+  }, [user]); // Removed currentProjectId
+
+  // Fetch full details for a single project
+  const fetchProjectDetails = useCallback(async (projectId: string) => {
+    if (!user || !projectId) return;
+    // Check if we need to load (optional optimization: track 'loaded' timestamp)
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+            sequences (
+                *,
+                scenes (*)
+            ),
+            connections (*),
+            prompts (*),
+            moodboard_items (*)
+        `)
+        .eq('id', projectId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const mappedSequences = (data.sequences || []).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          storyContext: s.story_context,
+          isCollapsed: s.is_collapsed,
+          aspectRatio: s.aspect_ratio,
+          layoutDirection: s.layout_direction,
+          scenesSpacing: s.scenes_spacing,
+          isVisible: s.is_visible !== false,
+          position: { x: s.position_x || 0, y: s.position_y || 0 },
+          scenes: (s.scenes || []).map((sc: any) => ({
+            id: sc.id,
+            title: sc.title,
+            notes: sc.notes,
+            imageUrl: sc.image_url,
+            parentId: sc.parent_id,
+            isExpanded: sc.is_expanded,
+            isSubscene: sc.is_subscene,
+            aspectRatio: sc.aspect_ratio,
+            isVisible: sc.is_visible !== false,
+            position: { x: sc.position_x || 0, y: sc.position_y || 0 }
+          })).sort((a: any, b: any) => {
+            if (a.position?.y !== b.position?.y) return (a.position?.y || 0) - (b.position?.y || 0);
+            if (a.position?.x !== b.position?.x) return (a.position?.x || 0) - (b.position?.x || 0);
+            return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+          })
+        }));
+
+        const mappedConnections = (data.connections || []).map((c: any) => ({
+          id: c.id,
+          fromId: c.from_id,
+          toId: c.to_id,
+          fromType: c.from_type,
+          toType: c.to_type
+        }));
+
+        const mappedPrompts = (data.prompts || []).map((pr: any) => ({
+          ...pr,
+          imageUrl: pr.image_url
+        }));
+
+        const mappedMoodboard = (data.moodboard_items || []).map((m: any) => ({
+          ...m,
+          imageUrl: m.image_url
+        }));
+
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== projectId) return p;
+          return {
+            ...p,
+            sequences: mappedSequences,
+            connections: mappedConnections,
+            prompts: mappedPrompts,
+            moodboard: mappedMoodboard
+          };
+        }));
+      }
+
+    } catch (e) {
+      console.error("Error loading project details", e);
+    }
+  }, [user]);
 
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]); // user is in dependency of fetchProjects
+  }, [fetchProjects]);
+
+  // Lazy load details when project selected
+  useEffect(() => {
+    if (currentProjectId) {
+      // Optimization: check if sequences are empty? 
+      // But what if it's a new project with 0 sequences?
+      // We can check a flag or just fetch. Fetching single project is cheap.
+      // Let's check if we have data to avoid loop if possible, or naive fetch.
+      // For robustness against "empty project" being confused with "not loaded", 
+      // we might ideally have a `_loaded` flag. 
+      // Given constraints, we'll fetch every time we switch project ID, which is reasonable behavior (refresh data).
+      fetchProjectDetails(currentProjectId);
+    }
+  }, [currentProjectId, fetchProjectDetails]);
 
   // Derived state
   const currentProject = projects.find(p => p.id === currentProjectId) || null;
@@ -307,29 +376,7 @@ export function useProject() {
 
 
   // 4. Sequences
-  const addSequence = useCallback(async (position: Position, aspectRatio?: '16:9' | '9:16' | '4:3') => {
-    if (!currentProjectId) return;
-    try {
-      const newSeq = {
-        project_id: currentProjectId,
-        title: `Sequência`,
-        position_x: position.x,
-        position_y: position.y,
-        aspect_ratio: aspectRatio || '16:9',
-        is_collapsed: false,
-        story_context: ''
-      };
 
-      const { data, error } = await supabase.from('sequences').insert(newSeq).select().single();
-      if (error) throw error;
-
-      // Fetch or optimistic? Fetch is safer for IDs.
-      fetchProjects();
-    } catch (error) {
-      toast.error('Erro ao criar sequência');
-      console.error(error);
-    }
-  }, [currentProjectId, fetchProjects]);
 
   // History State
   interface HistoryCommand {
@@ -436,74 +483,158 @@ export function useProject() {
     }
   }, [currentProjectId, projects]); // Added projects dependency for snapshot
 
-  const deleteSequence = useCallback(async (id: string) => {
-    try {
-      // 1. Capture State for Undo
-      if (currentProjectId) {
-        const project = projects.find(p => p.id === currentProjectId);
-        const sequence = project?.sequences.find(s => s.id === id);
+  const deleteSequence = useCallback(async (id: string, trackHistory = true) => {
+    // 0. Preliminary Check & Capture State
+    if (!currentProjectId) return;
+    const project = projects.find(p => p.id === currentProjectId);
+    const sequence = project?.sequences.find(s => s.id === id);
 
-        if (sequence) {
-          // Define restoration command
-          const restoreSequence = async () => {
-            // 1. Restore Sequence Record
-            const { error: seqError } = await supabase.from('sequences').insert({
-              id: sequence.id, // Keep original ID!
-              project_id: currentProjectId,
-              title: sequence.title,
-              story_context: sequence.storyContext,
-              position_x: sequence.position.x,
-              position_y: sequence.position.y,
-              aspect_ratio: sequence.aspectRatio,
-              is_collapsed: sequence.isCollapsed
-            });
-            if (seqError) { console.error("Undo restore seq failed", seqError); return; }
+    if (!sequence) return;
 
-            // 2. Restore Scenes
-            if (sequence.scenes.length > 0) {
-              const scenesPayload = sequence.scenes.map(s => ({
-                id: s.id, // Keep ID
-                sequence_id: sequence.id,
-                title: s.title,
-                notes: s.notes,
-                image_url: s.imageUrl,
-                aspect_ratio: s.aspectRatio,
-                is_expanded: s.isExpanded,
-                is_subscene: s.isSubscene,
-                parent_id: s.parentId,
-                position_x: s.position?.x || 0,
-                position_y: s.position?.y || 0
-              }));
-              const { error: sceneError } = await supabase.from('scenes').insert(scenesPayload);
-              if (sceneError) console.error("Undo restore scenes failed", sceneError);
-            }
-
-            // Refresh to sync local state
-            fetchProjects();
-          };
-
-          addToHistory({
-            undo: async () => restoreSequence(),
-            redo: async () => deleteSequence(id) // Recurse to delete again
-          });
-        }
+    // 1. Optimistic Delete (Remove from UI immediately)
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return {
+        ...p,
+        sequences: p.sequences.filter(s => s.id !== id),
+        connections: p.connections.filter(c => c.fromId !== id && c.toId !== id)
       }
+    }));
 
+    try {
+      // 2. Perform DB Deletion
       const { error } = await supabase.from('sequences').delete().eq('id', id);
       if (error) throw error;
 
+      // 3. History Tracking (Post-success or Pre-success? Ideally pre, but here is fine)
+      if (trackHistory) {
+        // Define restoration command (Optimistic Restore)
+        const restoreSequence = async () => {
+          // Optimistic Restore UI
+          setProjectsState(prev => prev.map(p => {
+            if (p.id !== currentProjectId) return p;
+            return { ...p, sequences: [...p.sequences, sequence] }; // Add back
+          }));
+
+          // Restore Sequence Record
+          const { error: seqError } = await supabase.from('sequences').insert({
+            id: sequence.id,
+            project_id: currentProjectId,
+            title: sequence.title,
+            story_context: sequence.storyContext,
+            position_x: sequence.position.x,
+            position_y: sequence.position.y,
+            aspect_ratio: sequence.aspectRatio,
+            is_collapsed: sequence.isCollapsed
+          });
+          if (seqError) { console.error("Undo restore seq failed", seqError); return; }
+
+          // Restore Scenes
+          if (sequence.scenes.length > 0) {
+            const scenesPayload = sequence.scenes.map(s => ({
+              id: s.id,
+              sequence_id: sequence.id,
+              title: s.title,
+              notes: s.notes,
+              image_url: s.imageUrl,
+              aspect_ratio: s.aspectRatio,
+              is_expanded: s.isExpanded,
+              is_subscene: s.isSubscene,
+              parent_id: s.parentId,
+              position_x: s.position?.x || 0,
+              position_y: s.position?.y || 0
+            }));
+            const { error: sceneError } = await supabase.from('scenes').insert(scenesPayload);
+            if (sceneError) console.error("Undo restore scenes failed", sceneError);
+          }
+        };
+
+        addToHistory({
+          undo: async () => restoreSequence(),
+          redo: async () => deleteSequence(id, false) // Recurse to delete again, no history
+        });
+      }
+
+    } catch (e) {
+      toast.error('Erro ao deletar sequência');
+      // Rollback (Add it back if delete failed)
       setProjectsState(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
         return {
           ...p,
-          sequences: p.sequences.filter(s => s.id !== id),
-          connections: p.connections.filter(c => c.fromId !== id && c.toId !== id) // Remove related connections locally
-        }
+          sequences: [...p.sequences, sequence]
+        };
       }));
-    } catch (e) {
-      toast.error('Erro ao deletar sequência');
     }
-  }, [currentProjectId, projects, fetchProjects]); // Added projects, fetchProjects
+  }, [currentProjectId, projects]); // Removed fetchProjects dependency
+
+
+
+  const addSequence = useCallback(async (position: Position, aspectRatio?: '16:9' | '9:16' | '4:3') => {
+    if (!currentProjectId) return;
+
+    const tempId = `temp-seq-${Date.now()}`;
+    const optimisticSeq: SequenceModule = {
+      id: tempId,
+      title: 'Sequência',
+      position,
+      aspectRatio: aspectRatio || '16:9',
+      isCollapsed: false,
+      storyContext: '',
+      scenes: [],
+      layoutDirection: 'horizontal'
+    };
+
+    // 1. Optimistic Update
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return { ...p, sequences: [...p.sequences, optimisticSeq] };
+    }));
+
+    try {
+      const newSeq = {
+        project_id: currentProjectId,
+        title: 'Sequência',
+        position_x: position.x,
+        position_y: position.y,
+        aspect_ratio: aspectRatio || '16:9',
+        is_collapsed: false,
+        story_context: ''
+      };
+
+      const { data, error } = await supabase.from('sequences').insert(newSeq).select().single();
+      if (error) throw error;
+
+      if (data) {
+        // 2. Commit Update (Swap Temp ID)
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            sequences: p.sequences.map(s => s.id === tempId ? {
+              ...s,
+              id: data.id,
+              // Sync any server-side defaults if necessary
+            } : s)
+          };
+        }));
+
+        // 3. History
+        addToHistory({
+          undo: async () => deleteSequence(data.id, false),
+          redo: async () => addSequence(position, aspectRatio)
+        });
+      }
+    } catch (error) {
+      toast.error('Erro ao criar sequência');
+      console.error(error);
+      // Rollback
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return { ...p, sequences: p.sequences.filter(s => s.id !== tempId) };
+      }));
+    }
+  }, [currentProjectId, deleteSequence]);
 
   const toggleCollapseSequence = useCallback((id: string) => {
     const seq = currentProject?.sequences.find(s => s.id === id);
@@ -522,52 +653,118 @@ export function useProject() {
 
   // 5. Scenes
   const addScene = useCallback(async (sequenceId: string, scene: Partial<SceneModule> = {}) => {
+    const tempId = `temp-${Date.now()}`;
+    const newSceneBase = {
+      title: scene.title || 'Nova Cena',
+      notes: scene.notes || '',
+      position: scene.position || { x: 0, y: 0 },
+      aspectRatio: scene.aspectRatio || '16:9',
+      isSubscene: scene.isSubscene || false,
+      isExpanded: scene.isExpanded || false,
+      isVisible: true,
+      parentId: scene.parentId,
+      imageUrl: scene.imageUrl
+    };
+
+    const optimisticScene: SceneModule = {
+      id: tempId,
+      ...newSceneBase,
+      title: newSceneBase.title, // Ensure compatibility
+      position: newSceneBase.position,
+      aspectRatio: newSceneBase.aspectRatio as any,
+      notes: newSceneBase.notes,
+      // ... any checks
+    };
+
+    // 1. Optimistic Update
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return {
+        ...p,
+        sequences: p.sequences.map(s => {
+          if (s.id !== sequenceId) return s;
+          return {
+            ...s,
+            scenes: [...s.scenes, optimisticScene]
+          };
+        })
+      };
+    }));
+
     try {
-      const newScene = {
+      const dbPayload = {
         sequence_id: sequenceId,
-        title: scene.title || 'Nova Cena',
-        notes: scene.notes || '',
-        position_x: scene.position?.x || 0,
-        position_y: scene.position?.y || 0,
-        aspect_ratio: scene.aspectRatio || '16:9',
-        is_subscene: scene.isSubscene || false,
-        is_expanded: scene.isExpanded || false,
+        title: newSceneBase.title,
+        notes: newSceneBase.notes,
+        position_x: newSceneBase.position.x,
+        position_y: newSceneBase.position.y,
+        aspect_ratio: newSceneBase.aspectRatio,
+        is_subscene: newSceneBase.isSubscene,
+        is_expanded: newSceneBase.isExpanded,
         is_visible: true,
-        parent_id: scene.parentId || null,
-        image_url: scene.imageUrl
+        parent_id: newSceneBase.parentId || null,
+        image_url: newSceneBase.imageUrl
       };
 
-      const { data, error } = await supabase.from('scenes').insert(newScene).select().single();
+      const { data, error } = await supabase.from('scenes').insert(dbPayload).select().single();
       if (error) throw error;
 
-      // History for Creation (Undo = Delete)
+      // 2. Commit Update (Swap Temp ID for Real ID)
       if (data) {
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            sequences: p.sequences.map(s => {
+              if (s.id !== sequenceId) return s;
+              return {
+                ...s,
+                scenes: s.scenes.map(sc => sc.id === tempId ? {
+                  ...sc,
+                  id: data.id,
+                  position: { x: data.position_x, y: data.position_y } // Ensure consistent shape
+                } : sc)
+              };
+            })
+          };
+        }));
+
+        // History for Creation (Undo = Delete)
         addToHistory({
-          undo: async () => deleteScene(sequenceId, data.id, false), // Pass flag to skip history in delete
+          undo: async () => deleteScene(sequenceId, data.id, false),
           redo: async () => {
-            // Re-create with same ID is tricky if strictly deleted. 
-            // Ideally, addScene should accept ID override or we soft-delete.
-            // For simplicity, Redo just calls addScene again (new ID will be generated, breaking continuity but works visually).
-            // OR we implement specific Restore logic.
-            // Let's keep it simple: Undo deletes it. Redo re-adds (with new ID for now unless we refactor).
+            // Redo re-adds. Ideally calls addScene again.
+            // We can't reuse the exact same ID easily without soft delete.
             addScene(sequenceId, scene);
           }
         });
       }
 
-      // Fetch to sync IDs
-      fetchProjects();
+      // 3. Fallback Fetch (Mental sanity check, maybe debounced or removed if confident)
+      // fetchProjects(); 
+      // Removed immediate fetchProjects to prevent UI flicker/replacement of the optimistic state
+      // unless we really need it. Only fetch if there's drift risk.
+
     } catch (e) {
       console.error(e);
       toast.error('Erro ao adicionar cena');
+      // Rollback
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          sequences: p.sequences.map(s => {
+            if (s.id !== sequenceId) return s;
+            return {
+              ...s,
+              scenes: s.scenes.filter(sc => sc.id !== tempId)
+            };
+          })
+        };
+      }));
     }
-  }, [fetchProjects]);
-  // ... updateScene ... (no changes needed for this block, it's outside replace range if carefully selected, but standardizing for replace)
+  }, [currentProjectId, deleteSequence]); // Removed fetchProjects dependency if not calling it
 
-  // ... (updateScene is implicitly kept or we need to be careful with range)
-  // WAIT: My replace range 439-596 COVERS updateScene. I must include it or I delete it.
-
-  // RE-INCLUDING updateScene implementation to avoid deletion
   const updateScene = useCallback(async (sequenceId: string, sceneId: string, updates: Partial<SceneModule>, trackHistory = true, previousStateOverride?: any) => {
     try {
       // 1. Capture Previous State
@@ -793,6 +990,16 @@ export function useProject() {
   // 8. Moodboard
   const addMoodBoardItem = useCallback(async (item: MoodBoardItem) => {
     if (!currentProjectId) return;
+
+    // Optimistic Update
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return {
+        ...p,
+        moodboard: [...(p.moodboard || []), item]
+      };
+    }));
+
     try {
       const newItem = {
         project_id: currentProjectId,
@@ -808,12 +1015,22 @@ export function useProject() {
       };
       const { error } = await supabase.from('moodboard_items').insert(newItem);
       if (error) throw error;
-      fetchProjects();
+
+      // No need to fetch if optimistic is correct, or fetch details:
+      // fetchProjectDetails(currentProjectId);
     } catch (e) {
       console.error("Error adding moodboard item", e);
       toast.error("Erro ao salvar item no moodboard");
+      // Rollback
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          moodboard: (p.moodboard || []).filter(m => m.id !== item.id)
+        };
+      }));
     }
-  }, [currentProjectId, fetchProjects]);
+  }, [currentProjectId]); // Removed fetchProjects dependency
 
   const updateMoodBoardItem = useCallback(async (id: string, updates: Partial<MoodBoardItem>) => {
     try {

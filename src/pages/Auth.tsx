@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Mail, Lock, User, ArrowRight, Github, Sparkles } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 export default function AuthPage() {
     const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +18,13 @@ export default function AuthPage() {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const navigate = useNavigate();
+    const { session } = useAuth();
+
+    useEffect(() => {
+        if (session) {
+            navigate('/');
+        }
+    }, [session, navigate]);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,7 +38,7 @@ export default function AuthPage() {
                 });
                 if (error) throw error;
                 toast.success('Bem-vindo de volta! 🚀');
-                navigate('/');
+                // Navigation handled by useEffect
             } else {
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -43,7 +52,6 @@ export default function AuthPage() {
                 });
                 if (error) throw error;
                 toast.success('Conta criada com sucesso! Verifique seu email.');
-                // Optionally auto-login or wait for verification
             }
         } catch (error: any) {
             toast.error(error.message || 'Erro na autenticação');
@@ -51,6 +59,7 @@ export default function AuthPage() {
             setIsLoading(false);
         }
     };
+    // ... rest of the file ...
 
     return (
         <div className="min-h-screen w-full flex bg-background overflow-hidden relative">
@@ -241,12 +250,4 @@ export default function AuthPage() {
             </div>
         </div>
     );
-}
-
-// Utility to fix missing cn import if needed, assuming it's available globally or imported
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs))
 }
