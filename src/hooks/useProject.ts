@@ -976,12 +976,40 @@ export function useProject() {
     }
   }, [currentProject, updateProjectMeta]);
 
+  const updatePromptCategory = useCallback(async (oldCategory: string, newCategory: string) => {
+    if (!currentProject || !oldCategory || !newCategory || oldCategory === newCategory) return;
+
+    try {
+      // 1. Update categories list locally and in DB
+      const newCategories = (currentProject.promptCategories || []).map(c => c === oldCategory ? newCategory : c);
+
+      // Update metadata (this handles the project.prompt_categories array)
+      await updateProjectMeta(currentProject.id, { promptCategories: newCategories });
+
+      // 2. Update all prompts references in DB
+      const { error } = await supabase
+        .from('prompts')
+        .update({ category: newCategory })
+        .eq('project_id', currentProject.id)
+        .eq('category', oldCategory);
+
+      if (error) throw error;
+
+      // 3. Refresh to sync everything
+      fetchProjects();
+      toast.success('Categoria renomeada com sucesso');
+    } catch (e) {
+      console.error("Error updating prompt category", e);
+      toast.error("Erro ao renomear categoria");
+    }
+  }, [currentProject, updateProjectMeta, fetchProjects]);
+
   const deletePromptCategory = useCallback(async (category: string) => {
     if (!currentProject) return;
 
     // 1. Update categories list
     const newCategories = (currentProject.promptCategories || []).filter(c => c !== category);
-    updateProjectMeta(currentProject.id, { promptCategories: newCategories });
+    await updateProjectMeta(currentProject.id, { promptCategories: newCategories });
 
     // 2. Delete prompts with this category
     try {
@@ -1129,6 +1157,7 @@ export function useProject() {
     updatePrompt,
     deletePrompt,
     addPromptCategory,
+    updatePromptCategory,
     deletePromptCategory,
     addMoodBoardItem,
     updateMoodBoardItem,

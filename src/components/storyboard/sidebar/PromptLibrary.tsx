@@ -9,6 +9,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
@@ -26,6 +34,7 @@ interface PromptLibraryProps {
     promptCategories: string[];
     onDeletePrompt: (id: string) => void;
     onDeletePromptCategory: (category: string) => void;
+    onUpdatePromptCategory?: (oldCategory: string, newCategory: string) => Promise<void>;
     onAddPromptCategory: (category: string) => void;
     onOpenAssets: () => void;
     fontStyles: { label: string; sub: string; icon: string };
@@ -41,6 +50,7 @@ export function PromptLibrary({
     promptCategories,
     onDeletePrompt,
     onDeletePromptCategory,
+    onUpdatePromptCategory,
     onAddPromptCategory,
     onOpenAssets,
     fontStyles: fs
@@ -49,11 +59,32 @@ export function PromptLibrary({
     const [newCategoryName, setNewCategoryName] = useState('');
     const [showCategoryInput, setShowCategoryInput] = useState(false);
 
+    // Rename state
+    const [renameCategoryOpen, setRenameCategoryOpen] = useState(false);
+    const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
+    const [renameName, setRenameName] = useState('');
+
     const handleAddCategory = () => {
         if (newCategoryName.trim()) {
             onAddPromptCategory(newCategoryName.trim());
             setNewCategoryName('');
             setShowCategoryInput(false);
+        }
+    };
+
+    const handleRenameClick = (cat: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCategoryToRename(cat);
+        setRenameName(cat);
+        setRenameCategoryOpen(true);
+    };
+
+    const handleRenameSubmit = async () => {
+        if (categoryToRename && renameName && renameName !== categoryToRename) {
+            await onUpdatePromptCategory?.(categoryToRename, renameName);
+            setRenameCategoryOpen(false);
+            setCategoryToRename(null);
         }
     };
 
@@ -97,9 +128,13 @@ export function PromptLibrary({
                             variant="ghost"
                             className={cn(
                                 "w-full justify-between text-left h-10 py-1.5 px-3 transition-all",
-                                currentView === 'prompts' ? "bg-primary/10 text-primary hover:bg-primary/20 shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                                currentView === 'prompts' && activeCategory === 'Tudo' ? "bg-primary/10 text-primary hover:bg-primary/20 shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                                 fs.label
                             )}
+                            onClick={() => {
+                                onViewChange('prompts');
+                                onSelectCategory('Tudo');
+                            }}
                         >
                             <div className="flex items-center gap-2">
                                 <Palette className={cn(fs.icon, "mr-3", currentView === 'prompts' && "text-primary")} />
@@ -148,6 +183,7 @@ export function PromptLibrary({
                                             onViewChange('prompts');
                                             onSelectCategory(cat);
                                         }}
+                                        onDoubleClick={(e) => handleRenameClick(cat, e)}
                                     >
                                         <ChevronRight className={cn(
                                             "w-3 h-3 mr-1 transition-transform duration-200 opacity-40 group-data-[state=open]:rotate-90 group-hover/cat:opacity-100",
@@ -231,6 +267,36 @@ export function PromptLibrary({
                 <ImageIcon className={cn(fs.icon, "mr-3", currentView === 'moodboard' && "text-primary")} />
                 <span className="font-medium tracking-tight">MoodBoard</span>
             </Button>
+
+            {/* Rename Category Dialog */}
+            <Dialog open={renameCategoryOpen} onOpenChange={setRenameCategoryOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Renomear Categoria</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="rename-name" className="text-right">
+                                Nome
+                            </Label>
+                            <Input
+                                id="rename-name"
+                                value={renameName}
+                                onChange={(e) => setRenameName(e.target.value)}
+                                className="col-span-3"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleRenameSubmit();
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRenameCategoryOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleRenameSubmit}>Salvar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

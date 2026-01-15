@@ -1,21 +1,39 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MoodBoardItem, Position } from '@/types/storyboard';
 import { cn } from '@/lib/utils';
-import { X, ZoomIn, ZoomOut, Move, Trash2 } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Move, Trash2, Copy, Scissors, ClipboardPaste, BringToFront } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+    ContextMenuSeparator,
+    ContextMenuShortcut,
+} from "@/components/ui/context-menu";
+import { toast } from "sonner";
 
 interface MoodBoardViewProps {
     items: MoodBoardItem[];
     onAddItem: (item: MoodBoardItem) => void;
     onUpdateItem: (id: string, updates: Partial<MoodBoardItem>) => void;
     onDeleteItem: (id: string) => void;
+    projectId: string;
 }
 
-export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: MoodBoardViewProps) {
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
+export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, projectId }: MoodBoardViewProps) {
+    // Initialize state from localStorage if available
+    const [zoom, setZoom] = useState(() => {
+        const saved = localStorage.getItem(`moodboard_zoom_${projectId}`);
+        return saved ? parseFloat(saved) : 1;
+    });
+    const [pan, setPan] = useState(() => {
+        const saved = localStorage.getItem(`moodboard_pan_${projectId}`);
+        return saved ? JSON.parse(saved) : { x: 0, y: 0 };
+    });
 
     const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [resizingId, setResizingId] = useState<string | null>(null);
     const resizeHandle = useRef<string | null>(null);
     const startSize = useRef({ width: 0, height: 0 });
@@ -25,7 +43,160 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
     const isPanningCanvas = useRef(false);
     const panStartPos = useRef<Position>({ x: 0, y: 0 });
 
-    // Handle image pasting
+    // Persist view state
+    useEffect(() => {
+        localStorage.setItem(`moodboard_zoom_${projectId}`, zoom.toString());
+        localStorage.setItem(`moodboard_pan_${projectId}`, JSON.stringify(pan));
+    }, [zoom, pan, projectId]);
+
+    const handlePasteImageBlob = useCallback((blob: Blob, position?: Position) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            const img = new Image();
+            img.src = base64;
+            img.onload = () => {
+                const container = document.getElementById('moodboard-container');
+                const rect = container?.getBoundingClientRect() || { width: 800, height: 600, left: 0, top: 0 };
+
+                let centerX, centerY;
+
+                if (position) {
+                    centerX = (position.x - rect.left - pan.x) / zoom;
+                    centerY = (position.y - rect.top - pan.y) / zoom;
+                } else {
+                    centerX = (rect.width / 2 - pan.x) / zoom;
+                    centerY = (rect.height / 2 - pan.y) / zoom;
+                }
+
+                let width = img.width;
+                let height = img.height;
+                const maxSize = 500;
+
+                if (width > maxSize || height > maxSize) {
+                    const ratio = Math.min(maxSize / width, maxSize / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+
+                onAddItem({
+                    id: Math.random().toString(36).substr(2, 9),
+                    type: 'image',
+                    content: base64,
+                    position: {
+                        x: centerX - width / 2,
+                        y: centerY - height / 2,
+                    },
+                    width,
+                    height,
+                    zIndex: (items?.length || 0) + 1
+                });
+            };
+        };
+        reader.readAsDataURL(blob);
+    }, [items, onAddItem, pan, zoom]);
+
+    const handleCopy = useCallback(async (item: MoodBoardItem) => {
+        try {
+            await navigator.clipboard.writeText(JSON.stringify({
+                storyflow_type: 'moodboard_item',
+                data: item
+            }));
+            toast.success("Copiado!", { position: 'bottom-center' });
+        } catch (e) {
+            toast.error("Erro ao copiar");
+        }
+    }, []);
+
+    const handleCut = useCallback(async (item: MoodBoardItem) => {
+        try {
+            await handleCopy(item);
+            onDeleteItem(item.id);
+        } catch (e) {
+            toast.error("Erro ao recortar");
+        }
+    }, [handleCopy, onDeleteItem]);
+
+    const handlePasteFromMenu = useCallback(async () => {
+        try {
+            // 1. Try accessing text (internal item)
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    const parsed = JSON.parse(text);
+                    if (parsed.storyflow_type === 'moodboard_item' && parsed.data) {
+                        const item = parsed.data as MoodBoardItem;
+                        // Add with slight offset or center
+                        onAddItem({
+                            ...item,
+                            id: Math.random().toString(36).substr(2, 9),
+                            position: {
+                                x: item.position.x + 20,
+                                y: item.position.y + 20
+                            },
+                            zIndex: (items?.length || 0) + 1
+                        });
+                        toast.success("Colado!", { position: 'bottom-center' });
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Not JSON or permission denied, continue to images
+            }
+
+            // 2. Try accessing images
+            const clipboardItems = await navigator.clipboard.read();
+            let foundImage = false;
+            for (const item of clipboardItems) {
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
+                    const blob = await item.getType(imageType);
+                    handlePasteImageBlob(blob); // Will paste at center
+                    foundImage = true;
+                }
+            }
+            if (foundImage) {
+                toast.success("Imagem colada!", { position: 'bottom-center' });
+            } else {
+                if (!foundImage) toast.info("Nenhuma imagem ou item compatível encontrado na área de transferência.", { position: 'bottom-center' });
+            }
+
+        } catch (e) {
+            console.error(e);
+            toast.error("Erro ao acessar área de transferência. Tente CTRL+V.", { position: 'bottom-center' });
+        }
+    }, [onAddItem, items, handlePasteImageBlob]);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Copy (Ctrl+C)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                if (selectedId) {
+                    const item = items.find(i => i.id === selectedId);
+                    if (item) handleCopy(item);
+                }
+            }
+
+            // Paste (Ctrl+V)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                handlePasteFromMenu();
+            }
+
+            // Delete
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedId) {
+                    onDeleteItem(selectedId);
+                    setSelectedId(null);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedId, items, handleCopy, handlePasteFromMenu, onDeleteItem]);
+
+    // Handle image pasting (CTRL+V event listener - backup/global)
     useEffect(() => {
         const handlePaste = (e: ClipboardEvent) => {
             const clipboardItems = e.clipboardData?.items;
@@ -35,47 +206,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
                 if (item.type.indexOf('image') !== -1) {
                     const blob = item.getAsFile();
                     if (blob) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const base64 = event.target?.result as string;
-                            const img = new Image();
-                            img.src = base64;
-                            img.onload = () => {
-                                // Determine insertion point (center of view)
-                                // View center in screen coords: width/2, height/2
-                                // Convert to canvas coords: (screen - pan) / zoom
-                                const container = document.getElementById('moodboard-container');
-                                const rect = container?.getBoundingClientRect() || { width: 800, height: 600 };
-
-                                const centerX = (rect.width / 2 - pan.x) / zoom;
-                                const centerY = (rect.height / 2 - pan.y) / zoom;
-
-                                let width = img.width;
-                                let height = img.height;
-                                const maxSize = 500;
-
-                                // Scale down if too big
-                                if (width > maxSize || height > maxSize) {
-                                    const ratio = Math.min(maxSize / width, maxSize / height);
-                                    width *= ratio;
-                                    height *= ratio;
-                                }
-
-                                onAddItem({
-                                    id: Math.random().toString(36).substr(2, 9),
-                                    type: 'image',
-                                    content: base64,
-                                    position: {
-                                        x: centerX - width / 2,
-                                        y: centerY - height / 2,
-                                    },
-                                    width,
-                                    height,
-                                    zIndex: (items?.length || 0) + 1
-                                });
-                            };
-                        };
-                        reader.readAsDataURL(blob);
+                        handlePasteImageBlob(blob);
                     }
                 }
             }
@@ -83,33 +214,67 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
 
         window.addEventListener('paste', handlePaste);
         return () => window.removeEventListener('paste', handlePaste);
-    }, [onAddItem, pan, zoom, items]);
+    }, [handlePasteImageBlob]);
 
-    const handleWheel = (e: React.WheelEvent) => {
-        if (e.ctrlKey || e.metaKey) {
+    // Improved Wheel Handler for Zoom and Pan
+    useEffect(() => {
+        const container = document.getElementById('moodboard-container');
+        if (!container) return;
+
+        const handleWheelEvent = (e: WheelEvent) => {
             e.preventDefault();
-            const delta = e.deltaY > 0 ? 0.9 : 1.1;
-            const newZoom = Math.min(Math.max(zoom * delta, 0.1), 5);
 
-            // Zoom towards cursor would be better, but center zoom is easier for now
-            // Or just simple zoom
-            setZoom(newZoom);
-        } else {
-            // Pan
-            setPan(prev => ({
-                x: prev.x - e.deltaX,
-                y: prev.y - e.deltaY
-            }));
-        }
-    };
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom Logic
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Calculate world coordinates before zoom
+                const worldX = (mouseX - pan.x) / zoom;
+                const worldY = (mouseY - pan.y) / zoom;
+
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newZoom = Math.min(Math.max(zoom * delta, 0.1), 5);
+
+                // Calculate new pan to keep world coordinates under mouse
+                const newPanX = mouseX - worldX * newZoom;
+                const newPanY = mouseY - worldY * newZoom;
+
+                setZoom(newZoom);
+                setPan({ x: newPanX, y: newPanY });
+
+            } else {
+                // Pan Logic
+                // Support Shift+Wheel for horizontal scrolling
+                // Standard mouse: deltaX is 0, shift key swaps it in some browsers/OS, but we enforce it here manually if needed
+                let dx = e.deltaX;
+                let dy = e.deltaY;
+
+                if (e.shiftKey && dx === 0) {
+                    dx = dy;
+                    dy = 0;
+                }
+
+                setPan(prev => ({
+                    x: prev.x - dx,
+                    y: prev.y - dy
+                }));
+            }
+        };
+
+        container.addEventListener('wheel', handleWheelEvent, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheelEvent);
+        };
+    }, [zoom, pan]);
 
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.button === 0 && !draggingId) {
-            // Only pan if not dragging an item
-            // Actually, let's use spacebar or middle click for panning if we want drag-select, 
-            // but for now, clicking on empty space pans.
             isPanningCanvas.current = true;
             panStartPos.current = { x: e.clientX, y: e.clientY };
+            setSelectedId(null);
         }
     };
 
@@ -117,6 +282,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
         e.stopPropagation();
         if (e.button === 0) {
             setDraggingId(id);
+            setSelectedId(id);
             dragStartPos.current = { x: e.clientX, y: e.clientY };
             itemStartPos.current = { ...position };
         }
@@ -133,6 +299,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        // ... existing resize/drag logic ...
         if (draggingId) {
             const dx = (e.clientX - dragStartPos.current.x) / zoom;
             const dy = (e.clientY - dragStartPos.current.y) / zoom;
@@ -144,6 +311,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
                 }
             });
         } else if (resizingId) {
+            // ... copy existing resizing logic ...
             const dx = (e.clientX - dragStartPos.current.x) / zoom;
             const dy = (e.clientY - dragStartPos.current.y) / zoom;
             const handle = resizeHandle.current;
@@ -192,103 +360,148 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem }: 
     };
 
     return (
-        <div
-            id="moodboard-container"
-            className="w-full h-full bg-[#1a1a1a] overflow-hidden relative cursor-grab active:cursor-grabbing"
-            onWheel={handleWheel}
-            onMouseDown={handleCanvasMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            style={{
-                backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)',
-                backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-                backgroundPosition: `${pan.x}px ${pan.y}px`
-            }}
-        >
-            <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur-md p-3 rounded-lg text-white/70 pointer-events-none select-none shadow-lg border border-white/5">
-                <h2 className="text-base font-semibold text-white mb-1">MoodBoard Infinito</h2>
-                <p className="text-[10px] leading-tight opacity-80">CTRL+V para colar imagens</p>
-                <p className="text-[10px] leading-tight opacity-80">Arraste para mover imagens</p>
-                <p className="text-[10px] leading-tight opacity-80">Scroll para navegar (CTRL+Scroll para zoom)</p>
-            </div>
-
-            <div
-                style={{
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                    transformOrigin: '0 0',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%'
-                }}
-            >
-                {items?.map(item => (
-                    <div
-                        key={item.id}
-                        className="absolute group shadow-xl hover:shadow-2xl transition-shadow select-none"
-                        style={{
-                            left: item.position.x,
-                            top: item.position.y,
-                            width: item.width,
-                            height: item.height,
-                            zIndex: item.zIndex
-                        }}
-                        onMouseDown={(e) => handleItemMouseDown(e, item.id, item.position)}
-                    >
-                        <img
-                            src={item.content}
-                            alt="moodboard-item"
-                            className="w-full h-full object-contain pointer-events-none"
-                        />
-
-                        {/* Resize Handles */}
-                        <div
-                            className="absolute -top-1 -left-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-nw-resize z-50 transition-opacity"
-                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'nw', item)}
-                        />
-                        <div
-                            className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-ne-resize z-50 transition-opacity"
-                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'ne', item)}
-                        />
-                        <div
-                            className="absolute -bottom-1 -left-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-sw-resize z-50 transition-opacity"
-                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'sw', item)}
-                        />
-                        <div
-                            className="absolute -bottom-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-se-resize z-50 transition-opacity"
-                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'se', item)}
-                        />
-
-                        {/* Action Buttons (visible on hover) */}
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/80 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 z-[60]">
-                            <button
-                                className="p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-indigo-400 transition-colors"
-                                title="Trazer para Frente"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    const maxZ = Math.max(...items.map(i => i.zIndex || 0), 0);
-                                    onUpdateItem(item.id, { zIndex: maxZ + 1 });
-                                }}
-                            >
-                                <Move className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="w-px h-3 bg-white/20 mx-0.5" />
-                            <button
-                                className="p-1.5 hover:bg-red-500/20 rounded-full text-white/70 hover:text-red-500 transition-colors"
-                                title="Excluir"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteItem(item.id);
-                                }}
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+        <ContextMenu>
+            <ContextMenuTrigger className="w-full h-full block">
+                <div
+                    id="moodboard-container"
+                    className="w-full h-full bg-[#1a1a1a] overflow-hidden relative cursor-grab active:cursor-grabbing outline-none"
+                    onMouseDown={handleCanvasMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    style={{
+                        backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)',
+                        backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+                        backgroundPosition: `${pan.x}px ${pan.y}px`
+                    }}
+                >
+                    <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur-md p-3 rounded-lg text-white/70 pointer-events-none select-none shadow-lg border border-white/5">
+                        <h2 className="text-base font-semibold text-white mb-1">MoodBoard Infinito</h2>
+                        <p className="text-[10px] leading-tight opacity-80">Botão Direito: Menu de Contexto</p>
+                        <p className="text-[10px] leading-tight opacity-80">CTRL+V também funciona</p>
+                        <p className="text-[10px] leading-tight opacity-80">Scroll para navegar (CTRL+Scroll para zoom)</p>
                     </div>
-                ))}
-            </div>
-        </div>
+
+                    <div
+                        style={{
+                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                            transformOrigin: '0 0',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%'
+                        }}
+                    >
+                        {items?.map(item => (
+                            <ContextMenu key={item.id}>
+                                <ContextMenuTrigger asChild>
+                                    <div
+                                        className={cn(
+                                            "absolute group shadow-xl hover:shadow-2xl transition-shadow select-none outline-none",
+                                            selectedId === item.id && "ring-2 ring-primary ring-offset-2 ring-offset-[#1a1a1a]"
+                                        )}
+                                        style={{
+                                            left: item.position.x,
+                                            top: item.position.y,
+                                            width: item.width,
+                                            height: item.height,
+                                            zIndex: item.zIndex
+                                        }}
+                                        onMouseDown={(e) => handleItemMouseDown(e, item.id, item.position)}
+                                    >
+                                        <img
+                                            src={item.content}
+                                            alt="moodboard-item"
+                                            className="w-full h-full object-contain pointer-events-none"
+                                        />
+
+                                        {/* Resize Handles */}
+                                        <div
+                                            className="absolute -top-1 -left-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-nw-resize z-50 transition-opacity"
+                                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'nw', item)}
+                                        />
+                                        <div
+                                            className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-ne-resize z-50 transition-opacity"
+                                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'ne', item)}
+                                        />
+                                        <div
+                                            className="absolute -bottom-1 -left-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-sw-resize z-50 transition-opacity"
+                                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'sw', item)}
+                                        />
+                                        <div
+                                            className="absolute -bottom-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border border-white opacity-0 group-hover:opacity-100 cursor-se-resize z-50 transition-opacity"
+                                            onMouseDown={(e) => handleResizeMouseDown(e, item.id, 'se', item)}
+                                        />
+
+                                        {/* Action Buttons (visible on hover) */}
+                                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/80 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 z-[60]">
+                                            <button
+                                                className="p-1.5 hover:bg-white/10 rounded-full text-white/70 hover:text-indigo-400 transition-colors"
+                                                title="Trazer para Frente"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const maxZ = Math.max(...items.map(i => i.zIndex || 0), 0);
+                                                    onUpdateItem(item.id, { zIndex: maxZ + 1 });
+                                                }}
+                                            >
+                                                <Move className="w-3.5 h-3.5" />
+                                            </button>
+                                            <div className="w-px h-3 bg-white/20 mx-0.5" />
+                                            <button
+                                                className="p-1.5 hover:bg-red-500/20 rounded-full text-white/70 hover:text-red-500 transition-colors"
+                                                title="Excluir"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDeleteItem(item.id);
+                                                }}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </ContextMenuTrigger>
+                                <ContextMenuContent className="w-48 bg-[#1e1e1e] border-[#333] text-white">
+                                    <ContextMenuItem onClick={() => handleCut(item)} className="hover:bg-[#333] focus:bg-[#333]">
+                                        <Scissors className="w-4 h-4 mr-2" />
+                                        Recortar
+                                        <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleCopy(item)} className="hover:bg-[#333] focus:bg-[#333]">
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Copiar
+                                        <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuSeparator className="bg-[#333]" />
+                                    <ContextMenuItem
+                                        onClick={() => {
+                                            const maxZ = Math.max(...items.map(i => i.zIndex || 0), 0);
+                                            onUpdateItem(item.id, { zIndex: maxZ + 1 });
+                                        }}
+                                        className="hover:bg-[#333] focus:bg-[#333]"
+                                    >
+                                        <BringToFront className="w-4 h-4 mr-2" />
+                                        Trazer para Frente
+                                    </ContextMenuItem>
+                                    <ContextMenuSeparator className="bg-[#333]" />
+                                    <ContextMenuItem onClick={() => onDeleteItem(item.id)} className="text-red-400 hover:text-red-300 hover:bg-red-900/20 focus:bg-red-900/20">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Excluir
+                                        <ContextMenuShortcut>⌫</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                </ContextMenuContent>
+                            </ContextMenu>
+                        ))}
+                    </div>
+                </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-48 bg-[#1e1e1e] border-[#333] text-white">
+                <ContextMenuItem onClick={handlePasteFromMenu} className="hover:bg-[#333] focus:bg-[#333]">
+                    <ClipboardPaste className="w-4 h-4 mr-2" />
+                    Colar
+                    <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }

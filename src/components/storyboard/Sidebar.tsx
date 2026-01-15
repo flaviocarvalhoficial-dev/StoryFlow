@@ -31,6 +31,7 @@ interface SidebarProps {
   onDeletePrompt: (id: string) => void;
   promptCategories: string[];
   onAddPromptCategory: (category: string) => void;
+  onUpdatePromptCategory?: (oldCategory: string, newCategory: string) => Promise<void>;
   onDeletePromptCategory: (category: string) => void;
   onAddSequence: () => void;
   onDeleteSequence: (id: string) => void;
@@ -72,6 +73,7 @@ export function Sidebar({
   onDeletePrompt,
   promptCategories,
   onAddPromptCategory,
+  onUpdatePromptCategory,
   onDeletePromptCategory,
   onAddSequence,
   onDeleteSequence,
@@ -181,6 +183,7 @@ export function Sidebar({
       <SidebarHeader
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        projectName={currentProject?.name}
       />
 
       <ScrollArea className="flex-1">
@@ -212,6 +215,7 @@ export function Sidebar({
               promptCategories={promptCategories}
               onDeletePrompt={onDeletePrompt}
               onDeletePromptCategory={onDeletePromptCategory}
+              onUpdatePromptCategory={onUpdatePromptCategory}
               onAddPromptCategory={onAddPromptCategory}
               onOpenAssets={onOpenAssets}
               fontStyles={fs}

@@ -141,7 +141,8 @@ export function StoryboardApp() {
     canRedo,
     addMoodBoardItem,
     updateMoodBoardItem,
-    deleteMoodBoardItem
+    deleteMoodBoardItem,
+    updatePromptCategory
   } = useProject();
 
   useEffect(() => {
@@ -352,6 +353,8 @@ export function StoryboardApp() {
       ) : currentView === 'prompts' ? (
         <PromptLibraryView
           category={activeCategory}
+          categories={currentProject.promptCategories || []}
+          onSelectCategory={handleSwitchToCategory}
           prompts={currentProject.prompts}
           onAddPrompt={() => {
             setEditingPrompt(null);
@@ -363,6 +366,8 @@ export function StoryboardApp() {
           }}
           onUpdatePrompt={updatePrompt}
           onDeletePrompt={deletePrompt}
+          onUpdatePromptCategory={updatePromptCategory}
+          onDeletePromptCategory={deletePromptCategory}
         />
       ) : currentView === 'projects' ? (
         <ProjectLibraryView
@@ -382,6 +387,7 @@ export function StoryboardApp() {
           onAddItem={addMoodBoardItem}
           onUpdateItem={updateMoodBoardItem}
           onDeleteItem={deleteMoodBoardItem}
+          projectId={currentProject.id}
         />
       )}
 
