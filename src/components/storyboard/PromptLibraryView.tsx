@@ -32,6 +32,7 @@ interface PromptLibraryViewProps {
     onDeletePrompt: (id: string) => void;
     onUpdatePromptCategory?: (oldCategory: string, newCategory: string) => Promise<void>;
     onDeletePromptCategory?: (category: string) => Promise<void>;
+    onAddPromptCategory?: (category: string) => void;
 }
 
 export function PromptLibraryView({
@@ -45,6 +46,7 @@ export function PromptLibraryView({
     onDeletePrompt,
     onUpdatePromptCategory,
     onDeletePromptCategory,
+    onAddPromptCategory,
     projectId,
 }: PromptLibraryViewProps) {
     const isOverview = category === 'Tudo';
@@ -55,6 +57,9 @@ export function PromptLibraryView({
     const [coverDialogOpen, setCoverDialogOpen] = useState(false);
     const [categoryForCover, setCategoryForCover] = useState<string | null>(null);
     const [coverUrl, setCoverUrl] = useState('');
+
+    const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
 
     // Load covers from localStorage
     const getStoredCovers = () => {
@@ -137,6 +142,14 @@ export function PromptLibraryView({
         }
     };
 
+    const handleAddCategorySubmit = () => {
+        if (newCategoryName.trim()) {
+            onAddPromptCategory?.(newCategoryName.trim());
+            setNewCategoryName('');
+            setAddCategoryOpen(false);
+        }
+    };
+
     // Filter prompts based on category
     const filteredPrompts = isOverview
         ? prompts // Just in case, though we render categories instead
@@ -146,11 +159,7 @@ export function PromptLibraryView({
         return (
             <div className="flex-1 flex flex-col bg-background overflow-hidden">
                 <div className="h-16 border-b border-border flex items-center justify-between px-8 bg-card/50 backdrop-blur-sm">
-                    <h1 className="text-xl font-bold tracking-tight">Biblioteca de Prompts</h1>
-                    <Button onClick={onAddPrompt} size="sm" className="gap-2">
-                        <Plus className="w-4 h-4" />
-                        Novo Prompt
-                    </Button>
+                    <h1 className="text-xl font-bold tracking-tight">Categorias de Prompts</h1>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8">
@@ -222,24 +231,29 @@ export function PromptLibraryView({
                             );
                         })}
 
-                        {/* Uncategorized Card */}
-                        <div
-                            onClick={() => onSelectCategory?.('Sem Categoria')}
-                            className="group aspect-[3/2] bg-card border border-border border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02]"
-                        >
-                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                                <FolderOpen className="w-6 h-6 text-muted-foreground opacity-50" />
+                        {/* Uncategorized Card - Only show if there are actually uncategorized prompts */}
+                        {prompts.filter(p => !p.category).length > 0 && (
+                            <div
+                                onClick={() => onSelectCategory?.('Sem Categoria')}
+                                className="group aspect-[3/2] bg-card border border-border border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02]"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                                    <FolderOpen className="w-6 h-6 text-muted-foreground opacity-50" />
+                                </div>
+                                <div className="text-center">
+                                    <h3 className="font-semibold text-lg text-muted-foreground">Sem Categoria</h3>
+                                    <p className="text-sm text-muted-foreground/70">{prompts.filter(p => !p.category).length} prompts</p>
+                                </div>
                             </div>
-                            <div className="text-center">
-                                <h3 className="font-semibold text-lg text-muted-foreground">Sem Categoria</h3>
-                                <p className="text-sm text-muted-foreground/70">{prompts.filter(p => !p.category).length} prompts</p>
-                            </div>
-                        </div>
+                        )}
 
-                        {/* New Category Button (Optional) */}
+                        {/* New Category Button */}
                         <div
+                            onClick={() => {
+                                setNewCategoryName('');
+                                setAddCategoryOpen(true);
+                            }}
                             className="aspect-[3/2] border border-border border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer opacity-50 hover:opacity-100 hover:border-primary/50 hover:bg-muted/30 transition-all"
-                        // Note: We'd need a handler for adding category here, but for now just visual or sidebar handles it
                         >
                             <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                                 <Plus className="w-5 h-5" />
@@ -248,6 +262,36 @@ export function PromptLibraryView({
                         </div>
                     </div>
                 </div>
+
+                <Dialog open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Nova Categoria</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="category-name" className="text-right">
+                                    Nome
+                                </Label>
+                                <Input
+                                    id="category-name"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="Ex: Cinematic, Anime, Realista..."
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddCategorySubmit();
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setAddCategoryOpen(false)}>Cancelar</Button>
+                            <Button onClick={handleAddCategorySubmit}>Criar Categoria</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
                 <Dialog open={renameCategoryOpen} onOpenChange={setRenameCategoryOpen}>
                     <DialogContent>
                         <DialogHeader>

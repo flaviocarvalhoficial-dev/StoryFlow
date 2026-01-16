@@ -377,6 +377,7 @@ export function StoryboardApp() {
           onDeletePrompt={deletePrompt}
           onUpdatePromptCategory={updatePromptCategory}
           onDeletePromptCategory={deletePromptCategory}
+          onAddPromptCategory={addPromptCategory}
           projectId={currentProject.id}
         />
       ) : currentView === 'projects' ? (
@@ -402,6 +403,8 @@ export function StoryboardApp() {
           onRedo={redo}
           canUndo={canUndo}
           canRedo={canRedo}
+          currentBg={currentProject.canvasBg}
+          onSetBg={setCanvasBg}
         />
       )}
 

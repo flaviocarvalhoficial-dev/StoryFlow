@@ -80,14 +80,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { ptBR } from 'date-fns/locale';
 
 const TAG_COLORS = [
-    { name: 'Cinza', value: 'bg-slate-100 text-slate-700 border-slate-200' },
-    { name: 'Vermelho', value: 'bg-red-100 text-red-700 border-red-200' },
-    { name: 'Laranja', value: 'bg-orange-100 text-orange-700 border-orange-200' },
-    { name: 'Amarelo', value: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-    { name: 'Verde', value: 'bg-green-100 text-green-700 border-green-200' },
-    { name: 'Azul', value: 'bg-blue-100 text-blue-700 border-blue-200' },
-    { name: 'Roxo', value: 'bg-purple-100 text-purple-700 border-purple-200' },
-    { name: 'Rosa', value: 'bg-pink-100 text-pink-700 border-pink-200' },
+    { name: 'Slate', value: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+    { name: 'Red', value: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+    { name: 'Orange', value: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+    { name: 'Amber', value: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+    { name: 'Emerald', value: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+    { name: 'Blue', value: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+    { name: 'Indigo', value: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+    { name: 'Purple', value: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
 ];
 
 interface ProjectLibraryViewProps {
@@ -448,13 +448,13 @@ export function ProjectLibraryView({
                                     Novo Projeto
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[800px] gap-6">
+                            <DialogContent className="sm:max-w-[800px] gap-4 max-h-[90vh] overflow-y-auto">
                                 <DialogHeader>
                                     <DialogTitle className="text-xl">{editingProjectId ? 'Editar Projeto' : 'Criar Novo Projeto'}</DialogTitle>
                                 </DialogHeader>
-                                <div className="grid gap-6 py-4">
+                                <div className="grid gap-4 py-2">
                                     <div className="grid grid-cols-12 gap-4">
-                                        <div className="col-span-8 space-y-2">
+                                        <div className="col-span-8 space-y-1.5">
                                             <Label htmlFor="name">Nome do Projeto</Label>
                                             <Input
                                                 id="name"
@@ -463,7 +463,7 @@ export function ProjectLibraryView({
                                                 onChange={(e) => setNewProjectData(prev => ({ ...prev, name: e.target.value }))}
                                             />
                                         </div>
-                                        <div className="col-span-4 space-y-2">
+                                        <div className="col-span-4 space-y-1.5">
                                             <Label htmlFor="deadline">Meta de Execução</Label>
                                             <Popover>
                                                 <PopoverTrigger asChild>
@@ -516,7 +516,7 @@ export function ProjectLibraryView({
                                                 </PopoverContent>
                                             </Popover>
                                         </div>
-                                        <div className="col-span-12 space-y-2">
+                                        <div className="col-span-12 space-y-1.5">
                                             <Label htmlFor="desc">Descrição</Label>
                                             <Input
                                                 id="desc"
@@ -527,7 +527,7 @@ export function ProjectLibraryView({
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
+                                    <div className="space-y-1.5">
                                         <Label className="flex items-center justify-between">
                                             Roteiro / História
                                             <span className="text-xs text-muted-foreground font-normal">Opcional</span>
@@ -548,21 +548,21 @@ export function ProjectLibraryView({
                                             }}
                                             className="w-full"
                                         >
-                                            <TabsList className="grid w-full grid-cols-2 mb-2">
-                                                <TabsTrigger value="simple">Texto Completo</TabsTrigger>
-                                                <TabsTrigger value="structured">Por Cenas</TabsTrigger>
+                                            <TabsList className="grid w-full grid-cols-2 mb-2 h-8">
+                                                <TabsTrigger value="simple" className="text-xs">Texto Completo</TabsTrigger>
+                                                <TabsTrigger value="structured" className="text-xs">Por Cenas</TabsTrigger>
                                             </TabsList>
                                             <TabsContent value="simple" className="mt-0">
                                                 <Textarea
                                                     placeholder="Cole aqui sua história completa, roteiro ou descrição das cenas..."
-                                                    className="h-[200px] resize-none font-mono text-sm leading-relaxed custom-scrollbar"
+                                                    className="h-[120px] resize-none font-mono text-sm leading-relaxed custom-scrollbar"
                                                     value={newProjectData.script}
                                                     onChange={(e) => setNewProjectData(prev => ({ ...prev, script: e.target.value }))}
                                                 />
                                             </TabsContent>
-                                            <TabsContent value="structured" className="mt-0 space-y-3">
-                                                <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-                                                    <div className="space-y-3 pr-4">
+                                            <TabsContent value="structured" className="mt-0 space-y-2">
+                                                <ScrollArea className="h-[120px] w-full rounded-md border p-3">
+                                                    <div className="space-y-2 pr-4">
                                                         {newProjectData.structuredScript.map((scene, index) => (
                                                             <div key={scene.id} className="flex gap-2 items-start group">
                                                                 <div className="mt-2">
@@ -578,7 +578,7 @@ export function ProjectLibraryView({
                                                                 </div>
                                                                 <Textarea
                                                                     placeholder={`Cena ${index + 1}...`}
-                                                                    className="min-h-[60px] resize-y flex-1"
+                                                                    className="min-h-[50px] resize-y flex-1 text-sm p-2"
                                                                     value={scene.content}
                                                                     onChange={(e) => {
                                                                         setNewProjectData(prev => ({
@@ -603,7 +603,7 @@ export function ProjectLibraryView({
                                                             </div>
                                                         ))}
                                                         {newProjectData.structuredScript.length === 0 && (
-                                                            <div className="text-center py-8 border-2 border-dashed border-muted rounded-lg text-muted-foreground text-sm">
+                                                            <div className="text-center py-6 border-2 border-dashed border-muted rounded-lg text-muted-foreground text-xs">
                                                                 Adicione cenas para organizar seu roteiro.
                                                             </div>
                                                         )}
@@ -612,7 +612,7 @@ export function ProjectLibraryView({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="w-full border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-medium transition-all hover:border-primary/40 h-10"
+                                                    className="w-full border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-medium transition-all hover:border-primary/40 h-8 text-xs"
                                                     onClick={() => {
                                                         setNewProjectData(prev => ({
                                                             ...prev,
@@ -620,22 +620,22 @@ export function ProjectLibraryView({
                                                         }))
                                                     }}
                                                 >
-                                                    <Plus className="w-4 h-4 mr-2" /> Adicionar Cena
+                                                    <Plus className="w-3 h-3 mr-2" /> Adicionar Cena
                                                 </Button>
                                             </TabsContent>
                                         </Tabs>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-2 gap-4">
                                         {/* Coluna Esquerda: Tags */}
-                                        <div className="space-y-4">
+                                        <div className="space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <Label className="flex items-center gap-2">
                                                     <Tag className="w-4 h-4 text-primary" />
                                                     Tags do Projeto
                                                 </Label>
                                             </div>
-                                            <div className="border rounded-md p-3 h-[150px] overflow-y-auto flex flex-col gap-3 custom-scrollbar">
+                                            <div className="border rounded-md p-2 h-[100px] overflow-y-auto flex flex-col gap-2 custom-scrollbar">
                                                 <div className="flex gap-2">
                                                     <Popover open={isTagPopoverOpen} onOpenChange={(open) => {
                                                         setIsTagPopoverOpen(open);
@@ -646,10 +646,10 @@ export function ProjectLibraryView({
                                                                 variant="outline"
                                                                 role="combobox"
                                                                 aria-expanded={isTagPopoverOpen}
-                                                                className="w-full justify-between h-9 text-muted-foreground font-normal overflow-hidden"
+                                                                className="w-full justify-between h-8 text-muted-foreground font-normal overflow-hidden text-xs"
                                                             >
                                                                 {tagInput ? tagInput : "Adicionar ou gerenciar tags..."}
-                                                                <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                                <Plus className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                                                             </Button>
                                                         </PopoverTrigger>
                                                         <PopoverContent className="w-[300px] p-0" align="start">
@@ -703,6 +703,7 @@ export function ProjectLibraryView({
                                                                         placeholder="Procurar ou criar tag..."
                                                                         value={tagInput}
                                                                         onValueChange={setTagInput}
+                                                                        className="h-8 text-xs"
                                                                     />
                                                                     <CommandList>
                                                                         <CommandEmpty>
@@ -732,7 +733,7 @@ export function ProjectLibraryView({
                                                                             <CommandGroup heading="Tags Criadas">
                                                                                 {newProjectData.tags.map(tag => (
                                                                                     <CommandItem key={tag.id} className="group flex justify-between items-center" onSelect={() => { }}>
-                                                                                        <div className={cn("flex items-center gap-2 px-2 py-1 rounded text-xs", tag.color)}>
+                                                                                        <div className={cn("flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[10px] font-medium border", tag.color)}>
                                                                                             {tag.label}
                                                                                         </div>
                                                                                         <Button
@@ -761,7 +762,7 @@ export function ProjectLibraryView({
                                                         <Badge
                                                             key={tag.id}
                                                             variant="outline"
-                                                            className={cn("pl-2 pr-1 py-1 flex items-center gap-1 border-transparent cursor-pointer group hover:opacity-80 transition-opacity", tag.color)}
+                                                            className={cn("px-2.5 py-0.5 flex items-center gap-1 cursor-pointer group hover:opacity-80 transition-all text-[10px] font-medium rounded-full border shadow-sm", tag.color)}
                                                             onClick={() => {
                                                                 setEditingTagId(tag.id);
                                                                 setIsTagPopoverOpen(true);
@@ -778,24 +779,24 @@ export function ProjectLibraryView({
                                         </div>
 
                                         {/* Coluna Direita: Checklist */}
-                                        <div className="space-y-4">
+                                        <div className="space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <Label className="flex items-center gap-2">
                                                     <ListTodo className="w-4 h-4 text-primary" />
                                                     Etapas do Projeto
                                                 </Label>
-                                                <Button variant="outline" size="sm" onClick={handleAddStep} className="h-8 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary">
-                                                    <Plus className="w-3.5 h-3.5" />
+                                                <Button variant="outline" size="sm" onClick={handleAddStep} className="h-7 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary text-xs px-2">
+                                                    <Plus className="w-3 h-3" />
                                                     Nova
                                                 </Button>
                                             </div>
 
-                                            <ScrollArea className="h-[150px] w-full rounded-md border p-3">
-                                                <div className="space-y-2 pr-3">
+                                            <ScrollArea className="h-[100px] w-full rounded-md border p-2">
+                                                <div className="space-y-2 pr-2">
                                                     {newProjectData.checklist.map((step) => (
                                                         <div key={step.id} className="flex items-center gap-2 group animate-in slide-in-from-top-1 duration-200">
-                                                            <div className="w-4 h-4 border border-muted rounded flex items-center justify-center bg-muted/50 flex-shrink-0">
-                                                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                                                            <div className="w-3 h-3 border border-muted rounded flex items-center justify-center bg-muted/50 flex-shrink-0">
+                                                                <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
                                                             </div>
                                                             <Input
                                                                 placeholder="Nome da etapa..."

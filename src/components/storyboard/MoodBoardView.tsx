@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MoodBoardItem, Position } from '@/types/storyboard';
 import { cn } from '@/lib/utils';
-import { X, ZoomIn, ZoomOut, Move, Trash2, Copy, Scissors, ClipboardPaste, BringToFront, Undo2, Redo2, Maximize } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Move, Trash2, Copy, Scissors, ClipboardPaste, BringToFront, Undo2, Redo2, Maximize, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     ContextMenu,
@@ -10,6 +10,9 @@ import {
     ContextMenuTrigger,
     ContextMenuSeparator,
     ContextMenuShortcut,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 
@@ -23,9 +26,11 @@ interface MoodBoardViewProps {
     onRedo: () => void;
     canUndo: boolean;
     canRedo: boolean;
+    currentBg?: string;
+    onSetBg?: (bg: any) => void;
 }
 
-export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, projectId, onUndo, onRedo, canUndo, canRedo }: MoodBoardViewProps) {
+export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, projectId, onUndo, onRedo, canUndo, canRedo, currentBg, onSetBg }: MoodBoardViewProps) {
     // Initialize state from localStorage if available
     const [zoom, setZoom] = useState(() => {
         const saved = localStorage.getItem(`moodboard_zoom_${projectId}`);
@@ -438,18 +443,32 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
         isPanningCanvas.current = false;
     };
 
+    const getBgColor = () => {
+        switch (currentBg) {
+            case 'black': return '#000000';
+            case 'dark-gray': return '#1a1a1a';
+            case 'light-gray': return '#cccccc';
+            case 'white': return '#ffffff';
+            case 'medium': return '#2a2a2a';
+            case 'dark': return '#1a1a1a';
+            case 'light': return '#f5f5f5';
+            default: return '#1a1a1a';
+        }
+    };
+
     return (
         <ContextMenu>
             <ContextMenuTrigger className="w-full h-full block">
                 <div
                     id="moodboard-container"
-                    className="w-full h-full bg-[#1a1a1a] overflow-hidden relative cursor-grab active:cursor-grabbing outline-none"
+                    className="w-full h-full overflow-hidden relative cursor-grab active:cursor-grabbing outline-none"
                     onMouseDown={handleCanvasMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     style={{
-                        backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)',
+                        backgroundColor: getBgColor(),
+                        backgroundImage: `radial-gradient(circle, ${currentBg === 'white' || currentBg === 'light' || currentBg === 'light-gray' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)'} 1px, transparent 1px)`,
                         backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
                         backgroundPosition: `${pan.x}px ${pan.y}px`
                     }}
@@ -637,6 +656,39 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                     Colar
                     <ContextMenuShortcut>⌘V</ContextMenuShortcut>
                 </ContextMenuItem>
+                <ContextMenuSeparator className="bg-[#333]" />
+                <ContextMenuSub>
+                    <ContextMenuSubTrigger className="hover:bg-[#333] focus:bg-[#333]">
+                        <Palette className="w-4 h-4 mr-2" />
+                        Cores de Fundo
+                    </ContextMenuSubTrigger>
+                    <ContextMenuSubContent className="w-48 bg-[#1e1e1e] border-[#333] text-white">
+                        {[
+                            { id: 'white', label: 'Branco', color: '#ffffff' },
+                            { id: 'light-gray', label: 'Cinza Claro', color: '#cccccc' },
+                            { id: 'dark-gray', label: 'Cinza Escuro', color: '#1a1a1a' },
+                            { id: 'black', label: 'Preto', color: '#000000' },
+                            { id: 'medium', label: 'Médio', color: '#2a2a2a' }
+                        ].map((item) => (
+                            <ContextMenuItem
+                                key={item.id}
+                                onClick={() => onSetBg?.(item.id)}
+                                className="hover:bg-[#333] focus:bg-[#333]"
+                            >
+                                <div
+                                    className="w-3 h-3 rounded-full border border-white/20 mr-2"
+                                    style={{ backgroundColor: item.color }}
+                                />
+                                {item.label}
+                                {currentBg === item.id && <div className="ml-auto w-1 h-1 rounded-full bg-primary" />}
+                            </ContextMenuItem>
+                        ))}
+                        <ContextMenuSeparator className="bg-[#333]" />
+                        <ContextMenuItem onClick={() => onSetBg?.('light')} className="hover:bg-[#333] focus:bg-[#333] italic opacity-70">
+                            Resetar Tema
+                        </ContextMenuItem>
+                    </ContextMenuSubContent>
+                </ContextMenuSub>
             </ContextMenuContent>
         </ContextMenu>
     );
