@@ -109,7 +109,8 @@ export function useProject() {
         .select(`
             sequences (
                 *,
-                scenes (*)
+                scenes (*),
+                narrative_markers (*)
             ),
             connections (*),
             prompts (*),
@@ -131,6 +132,13 @@ export function useProject() {
           scenesSpacing: s.scenes_spacing,
           isVisible: s.is_visible !== false,
           position: { x: s.position_x || 0, y: s.position_y || 0 },
+          narrativeMarkers: (s.narrative_markers || []).map((nm: any) => ({
+            id: nm.id,
+            label: nm.label,
+            startSceneId: nm.start_scene_id,
+            endSceneId: nm.end_scene_id,
+            color: nm.color
+          })),
           scenes: (s.scenes || []).map((sc: any) => ({
             id: sc.id,
             title: sc.title,
@@ -601,6 +609,7 @@ export function useProject() {
       isCollapsed: false,
       storyContext: '',
       scenes: [],
+      narrativeMarkers: [],
       layoutDirection: 'horizontal'
     };
 
@@ -940,39 +949,150 @@ export function useProject() {
   }, [currentProjectId]);
 
   // 7. Prompts
+  // Helper for image upload
+  const uploadPromptImage = async (imageData: string, projectId: string) => {
+    if (!imageData || !imageData.startsWith('data:')) return imageData;
+
+    try {
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      const fileName = `${projectId}/${timestamp}-${random}.jpg`;
+
+      // Convert Base64 to Blob
+      const res = await fetch(imageData);
+      const blob = await res.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('prompt-images')
+        .upload(fileName, blob, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('prompt-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      return imageData; // Fallback
+    }
+  };
+
   const addPrompt = useCallback(async (prompt: any) => {
     if (!currentProjectId) return;
+
+    // Optimistic Update
+    const tempId = crypto.randomUUID();
+    const optimisticPrompt = { ...prompt, id: tempId, project_id: currentProjectId };
+
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return { ...p, prompts: [...(p.prompts || []), optimisticPrompt] };
+    }));
+
     try {
+      let imageUrl = prompt.imageUrl;
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        imageUrl = await uploadPromptImage(imageUrl, currentProjectId);
+      }
+
       const newPrompt = {
         project_id: currentProjectId,
         name: prompt.name,
         prompt: prompt.prompt,
-        category: prompt.category, // Schema uses category
-        image_url: prompt.imageUrl // Schema uses image_url
+        category: prompt.category,
+        image_url: imageUrl
       };
-      await supabase.from('prompts').insert(newPrompt);
-      fetchProjects();
-    } catch (e) { console.error(e); }
-  }, [currentProjectId, fetchProjects]);
+
+      const { data, error } = await supabase.from('prompts').insert(newPrompt).select().single();
+
+      if (error) throw error;
+
+      // Replace Temp ID
+      if (data) {
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            prompts: p.prompts.map(pr => pr.id === tempId ? { ...pr, id: data.id, imageUrl: data.image_url } : pr)
+          };
+        }));
+      }
+    } catch (e: any) {
+      console.error("Add prompt failed", e);
+      toast.error(`Erro ao adicionar prompt: ${e.message}`);
+      // Rollback
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return { ...p, prompts: p.prompts.filter(pr => pr.id !== tempId) };
+      }));
+    }
+  }, [currentProjectId]);
 
   const updatePrompt = useCallback(async (id: string, updates: any) => {
+    if (!currentProjectId) return;
+
+    // Optimistic
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return {
+        ...p,
+        prompts: p.prompts.map(pr => pr.id === id ? { ...pr, ...updates } : pr)
+      };
+    }));
+
     try {
       const dbUpdates: any = {};
       if (updates.name) dbUpdates.name = updates.name;
       if (updates.prompt) dbUpdates.prompt = updates.prompt;
-      if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
       if (updates.category) dbUpdates.category = updates.category;
+
+      if (updates.imageUrl) {
+        if (updates.imageUrl.startsWith('data:')) {
+          dbUpdates.image_url = await uploadPromptImage(updates.imageUrl, currentProjectId);
+        } else {
+          dbUpdates.image_url = updates.imageUrl;
+        }
+      }
 
       const { error } = await supabase.from('prompts').update(dbUpdates).eq('id', id);
       if (error) throw error;
-      fetchProjects();
-    } catch (e) { }
-  }, [fetchProjects]);
+
+    } catch (e: any) {
+      console.error("Update prompt failed", e);
+      toast.error("Erro ao atualizar prompt");
+      fetchProjects(); // Revert/Sync
+    }
+  }, [currentProjectId, fetchProjects]);
 
   const deletePrompt = useCallback(async (id: string) => {
-    await supabase.from('prompts').delete().eq('id', id);
-    fetchProjects();
-  }, [fetchProjects]);
+    if (!currentProjectId) return;
+
+    // Optimistic
+    const project = projects.find(p => p.id === currentProjectId);
+    const promptToDelete = project?.prompts.find(pr => pr.id === id);
+
+    setProjectsState(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return { ...p, prompts: p.prompts.filter(pr => pr.id !== id) };
+    }));
+
+    try {
+      const { error } = await supabase.from('prompts').delete().eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error("Delete prompt failed", e);
+      toast.error("Erro ao deletar prompt");
+      // Rollback
+      if (promptToDelete) {
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return { ...p, prompts: [...p.prompts, promptToDelete] };
+        }));
+      }
+    }
+  }, [currentProjectId, projects]);
 
   const addPromptCategory = useCallback((category: string) => {
     if (currentProject && !currentProject.promptCategories?.includes(category)) {
@@ -1201,6 +1321,126 @@ export function useProject() {
     deleteProject,
     updateProjectMeta,
     setCanvasBg,
+    // Narrative Markers
+    addNarrativeMarker: async (sequenceId: string, marker: Omit<import('@/types/storyboard').NarrativeMarker, 'id'>) => {
+      if (!currentProjectId) return;
+      // Optimistic
+      const tempId = crypto.randomUUID();
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          sequences: p.sequences.map(s => {
+            if (s.id !== sequenceId) return s;
+            return {
+              ...s,
+              narrativeMarkers: [...(s.narrativeMarkers || []), { ...marker, id: tempId }]
+            };
+          })
+        };
+      }));
+      try {
+        const { data, error } = await supabase
+          .from('narrative_markers')
+          .insert({
+            sequence_id: sequenceId,
+            label: marker.label,
+            start_scene_id: marker.startSceneId,
+            end_scene_id: marker.endSceneId,
+            color: marker.color
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        // Update real ID
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            sequences: p.sequences.map(s => {
+              if (s.id !== sequenceId) return s;
+              return {
+                ...s,
+                narrativeMarkers: s.narrativeMarkers.map(m => m.id === tempId ? { ...m, id: data.id } : m)
+              };
+            })
+          };
+        }));
+      } catch (e) {
+        console.error(e);
+        toast.error(`Erro ao criar marcador: ${(e as any).message || 'Erro desconhecido'}`);
+        // Rollback
+        setProjectsState(prev => prev.map(p => {
+          if (p.id !== currentProjectId) return p;
+          return {
+            ...p,
+            sequences: p.sequences.map(s => {
+              if (s.id !== sequenceId) return s;
+              return {
+                ...s,
+                narrativeMarkers: s.narrativeMarkers.filter(m => m.id !== tempId)
+              };
+            })
+          };
+        }));
+      }
+    },
+    updateNarrativeMarker: async (sequenceId: string, markerId: string, updates: Partial<import('@/types/storyboard').NarrativeMarker>) => {
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          sequences: p.sequences.map(s => {
+            if (s.id !== sequenceId) return s;
+            return {
+              ...s,
+              narrativeMarkers: s.narrativeMarkers.map(m => m.id === markerId ? { ...m, ...updates } : m)
+            };
+          })
+        };
+      }));
+      try {
+        const payload: any = {};
+        if (updates.label) payload.label = updates.label;
+        if (updates.startSceneId) payload.start_scene_id = updates.startSceneId;
+        if (updates.endSceneId) payload.end_scene_id = updates.endSceneId;
+        if (updates.color) payload.color = updates.color;
+
+        const { error } = await supabase
+          .from('narrative_markers')
+          .update(payload)
+          .eq('id', markerId);
+        if (error) throw error;
+      } catch (e) {
+        console.error(e);
+        toast.error("Erro ao atualizar marcador");
+      }
+    },
+    deleteNarrativeMarker: async (sequenceId: string, markerId: string) => {
+      setProjectsState(prev => prev.map(p => {
+        if (p.id !== currentProjectId) return p;
+        return {
+          ...p,
+          sequences: p.sequences.map(s => {
+            if (s.id !== sequenceId) return s;
+            return {
+              ...s,
+              narrativeMarkers: s.narrativeMarkers.filter(m => m.id !== markerId)
+            };
+          })
+        };
+      }));
+      try {
+        const { error } = await supabase
+          .from('narrative_markers')
+          .delete()
+          .eq('id', markerId);
+        if (error) throw error;
+      } catch (e) {
+        console.error(e);
+        toast.error("Erro ao deletar marcador");
+      }
+    },
     addSequence,
     updateSequence,
     deleteSequence,

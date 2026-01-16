@@ -25,7 +25,7 @@ export interface UserProfile {
 interface UserProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onUpdateProfile: (profile: UserProfile) => void;
+    onUpdateProfile: (profile: UserProfile, file?: Blob) => void;
     currentProfile: UserProfile;
 }
 
@@ -40,11 +40,12 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile, currentProf
         }
     }, [isOpen, currentProfile]);
 
+    const [selectedFile, setSelectedFile] = useState<Blob | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSave = () => {
         try {
-            onUpdateProfile(profile);
+            onUpdateProfile(profile, selectedFile || undefined);
             onClose();
         } catch (e) {
             console.error("Failed to save profile", e);
@@ -61,8 +62,8 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile, currentProf
         const file = e.target.files?.[0];
         if (file) {
             try {
-                // Resize and compress image to avoid LocalStorage quota limits
-                const compressedImage = await new Promise<string>((resolve) => {
+                // Resize and compress image to avoid large uploads
+                const { url, blob } = await new Promise<{ url: string, blob: Blob }>((resolve) => {
                     const reader = new FileReader();
                     reader.readAsDataURL(file);
                     reader.onload = (event) => {
@@ -90,12 +91,21 @@ export function UserProfileModal({ isOpen, onClose, onUpdateProfile, currentProf
                             canvas.height = height;
                             const ctx = canvas.getContext('2d');
                             ctx?.drawImage(img, 0, 0, width, height);
-                            resolve(canvas.toDataURL('image/jpeg', 0.7));
+
+                            canvas.toBlob((blob) => {
+                                if (blob) {
+                                    resolve({
+                                        url: canvas.toDataURL('image/jpeg', 0.8),
+                                        blob: blob
+                                    });
+                                }
+                            }, 'image/jpeg', 0.8);
                         };
                     };
                 });
 
-                setProfile(prev => ({ ...prev, avatarUrl: compressedImage }));
+                setProfile(prev => ({ ...prev, avatarUrl: url }));
+                setSelectedFile(blob);
             } catch (error) {
                 console.error("Error processing image", error);
             }

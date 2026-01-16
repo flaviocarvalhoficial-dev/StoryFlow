@@ -182,10 +182,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                 }
             }
 
-            // Paste (Ctrl+V)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-                handlePasteFromMenu();
-            }
+            // Paste (Ctrl+V) - Removed to avoid duplication with native 'paste' event
 
             // Delete
             if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -232,11 +229,37 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedId, items, handleCopy, handlePasteFromMenu, onDeleteItem, canUndo, canRedo, onUndo, onRedo]);
+    }, [selectedId, items, handleCopy, onDeleteItem, canUndo, canRedo, onUndo, onRedo]);
 
-    // Handle image pasting (CTRL+V event listener - backup/global)
+    // Handle image pasting (native paste)
     useEffect(() => {
         const handlePaste = (e: ClipboardEvent) => {
+            // 1. Try accessing text (internal item)
+            const text = e.clipboardData?.getData('text');
+            if (text) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (parsed.storyflow_type === 'moodboard_item' && parsed.data) {
+                        const item = parsed.data as MoodBoardItem;
+                        onAddItem({
+                            ...item,
+                            id: crypto.randomUUID(),
+                            position: {
+                                x: item.position.x + 20,
+                                y: item.position.y + 20
+                            },
+                            zIndex: (items?.length || 0) + 1
+                        });
+                        toast.success("Colado!", { position: 'bottom-center' });
+                        e.preventDefault();
+                        return;
+                    }
+                } catch (e) {
+                    // Not valid JSON, ignore
+                }
+            }
+
+            // 2. Try accessing images
             const clipboardItems = e.clipboardData?.items;
             if (!clipboardItems) return;
 
@@ -245,6 +268,7 @@ export function MoodBoardView({ items, onAddItem, onUpdateItem, onDeleteItem, pr
                     const blob = item.getAsFile();
                     if (blob) {
                         handlePasteImageBlob(blob);
+                        e.preventDefault();
                     }
                 }
             }

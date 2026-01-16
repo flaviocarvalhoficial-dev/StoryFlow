@@ -31,6 +31,9 @@ interface CanvasProps {
   connectionStyle: 'smooth' | 'straight';
   defaultRatio: '16:9' | '9:16' | '4:3';
   sceneBorderStyle: 'solid' | 'none';
+  onAddNarrativeMarker: (sequenceId: string, marker: any) => void;
+  onUpdateNarrativeMarker: (sequenceId: string, markerId: string, updates: any) => void;
+  onDeleteNarrativeMarker: (sequenceId: string, markerId: string) => void;
 }
 
 export function Canvas({
@@ -55,7 +58,10 @@ export function Canvas({
   onOpenViewer,
   gridStyle,
   connectionStyle,
-  defaultRatio
+  defaultRatio,
+  onAddNarrativeMarker,
+  onUpdateNarrativeMarker,
+  onDeleteNarrativeMarker
 }: CanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -416,6 +422,9 @@ export function Canvas({
                 onToggleSceneVisibility={(sceneId) => onToggleSceneVisibility(sequence.id, sceneId)}
                 onAddSubscene={(sceneId) => onAddSubscene(sequence.id, sceneId)}
                 onOpenViewer={() => onOpenViewer(sequence.id)}
+                onAddNarrativeMarker={(marker) => onAddNarrativeMarker(sequence.id, marker)}
+                onUpdateNarrativeMarker={(markerId, updates) => onUpdateNarrativeMarker(sequence.id, markerId, updates)}
+                onDeleteNarrativeMarker={(markerId) => onDeleteNarrativeMarker(sequence.id, markerId)}
               />
             )
           })}

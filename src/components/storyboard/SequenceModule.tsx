@@ -18,17 +18,30 @@ import {
   Edit2,
   Eye,
   EyeOff,
-  Film
+  Film,
+  Palette,
+  MoveHorizontal,
+  ChevronLeft,
+  Type,
+  X
 } from 'lucide-react';
 import { SequenceModule as SequenceModuleType, AspectRatio, Position, SceneModule } from '@/types/storyboard';
 import { SceneCard } from './SceneCard';
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +65,9 @@ interface SequenceModuleProps {
   onAddSubscene: (sceneId: string) => void;
   onOpenViewer: () => void;
   sceneBorderStyle?: 'solid' | 'none';
+  onAddNarrativeMarker: (marker: { label: string, startSceneId: string, endSceneId: string, color?: string }) => void;
+  onUpdateNarrativeMarker: (markerId: string, updates: any) => void;
+  onDeleteNarrativeMarker: (markerId: string) => void;
 }
 
 const aspectRatioIcons: Record<AspectRatio, React.ElementType> = {
@@ -80,11 +96,72 @@ function SequenceModuleComponent({
   onAddSubscene,
   onOpenViewer,
   sceneBorderStyle = 'solid',
+  onAddNarrativeMarker,
+  onUpdateNarrativeMarker,
+  onDeleteNarrativeMarker
 }: SequenceModuleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const dragStart = useRef<Position>({ x: 0, y: 0 });
   const moduleRef = useRef<HTMLDivElement>(null);
+
+  // Grouping Logic for Markers
+  const topLevelScenes = (sequence.scenes || []).filter(s => !s.parentId && s.isVisible !== false);
+
+  const updateMarkerRange = (markerId: string, edge: 'start' | 'end', direction: 'forward' | 'backward') => {
+    const marker = sequence.narrativeMarkers?.find(m => m.id === markerId);
+    if (!marker) return;
+
+    const startIndex = topLevelScenes.findIndex(s => s.id === marker.startSceneId);
+    const endIndex = topLevelScenes.findIndex(s => s.id === marker.endSceneId);
+
+    if (startIndex === -1 || endIndex === -1) return;
+
+    let newStartIndex = startIndex;
+    let newEndIndex = endIndex;
+
+    if (edge === 'start') {
+      if (direction === 'backward') newStartIndex = Math.max(0, startIndex - 1);
+      if (direction === 'forward') newStartIndex = Math.min(endIndex, startIndex + 1);
+    } else {
+      if (direction === 'backward') newEndIndex = Math.max(startIndex, endIndex - 1);
+      if (direction === 'forward') newEndIndex = Math.min(topLevelScenes.length - 1, endIndex + 1);
+    }
+
+    if (newStartIndex !== startIndex || newEndIndex !== endIndex) {
+      onUpdateNarrativeMarker(markerId, {
+        startSceneId: topLevelScenes[newStartIndex].id,
+        endSceneId: topLevelScenes[newEndIndex].id
+      });
+    }
+  };
+
+  const getGroupedScenes = () => {
+    const groups: { type: 'marker' | 'scene', data: any, key: string }[] = [];
+
+    let i = 0;
+    while (i < topLevelScenes.length) {
+      const scene = topLevelScenes[i];
+      // Check if this scene starts a marker (and that marker is valid/ends in this list)
+      const marker = (sequence.narrativeMarkers || []).find(m => m.startSceneId === scene.id);
+      const endIndex = marker ? topLevelScenes.findIndex(s => s.id === marker.endSceneId) : -1;
+
+      if (marker && endIndex >= i) {
+        // Group scenes
+        const grouped = topLevelScenes.slice(i, endIndex + 1);
+        groups.push({ type: 'marker', data: { marker, scenes: grouped }, key: marker.id });
+        i = endIndex + 1;
+      } else {
+        groups.push({ type: 'scene', data: scene, key: scene.id });
+        i++;
+      }
+    }
+    return groups;
+  };
+
+  const groupedItems = sequence.isCollapsed
+    ? topLevelScenes.map(s => ({ type: 'scene' as const, data: s, key: s.id }))
+    : getGroupedScenes();
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.no-drag')) return;
@@ -143,21 +220,17 @@ function SequenceModuleComponent({
           sequence.layoutDirection === 'horizontal' ? "flex-row" : "flex-col",
           isTopLevel && sequence.isCollapsed && (
             sequence.layoutDirection === 'horizontal'
-              ? index === 0 ? "ml-0" : "-ml-[200px]"
+              ? index === 0 ? "ml-0" : "-ml-[220px]"
               : index === 0 ? "mt-0" : getStackMargin(sequence.aspectRatio)
           )
         )}
-        style={isTopLevel && sequence.isCollapsed ? {
-          transform: `
-            translateX(${sequence.layoutDirection === 'horizontal' ? index * 8 : (index % 2) * 4}px) 
-            translateY(${sequence.layoutDirection === 'horizontal' ? (index % 2) * 4 : index * 8}px) 
-            rotate(${index % 2 === 0 ? 3 + index : -2 - index}deg)
-            scale(0.95)
-          `,
-          zIndex: sequence.scenes.length - index,
-        } : {
-          zIndex: 1,
-          transform: 'none'
+        style={{
+          zIndex: isTopLevel ? ((sequence.scenes.length + 50) - index) : 1,
+          transform: isTopLevel && sequence.isCollapsed ? `
+            translateX(${index === 0 ? 0 : (index % 3 - 1) * 6}px) 
+            translateY(${index === 0 ? 0 : (index % 2 === 0 ? 4 : -4)}px) 
+            rotate(${index === 0 ? 0 : (index % 2 === 0 ? 1 : -1) * (3 + (index % 3))}deg)
+          ` : 'none'
         }}
       >
         <div className="relative group/scenewrap">
@@ -352,6 +425,72 @@ function SequenceModuleComponent({
                     Renomear
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    const topLevel = (sequence.scenes || []).filter(s => !s.parentId && s.isVisible !== false);
+                    const existingMarkers = sequence.narrativeMarkers || [];
+
+                    // Helper to get ranges
+                    const coveredIndices = new Set<number>();
+                    existingMarkers.forEach(m => {
+                      const sIdx = topLevel.findIndex(s => s.id === m.startSceneId);
+                      const eIdx = topLevel.findIndex(s => s.id === m.endSceneId);
+
+                      if (sIdx !== -1 && eIdx !== -1) {
+                        // Only mark range if it's valid (start <= end)
+                        // If inverted (start > end), we treat it as just the start index to avoid phantom blocking
+                        if (sIdx <= eIdx) {
+                          for (let k = sIdx; k <= eIdx; k++) {
+                            coveredIndices.add(k);
+                          }
+                        } else {
+                          // Inverted marker - only count start
+                          coveredIndices.add(sIdx);
+                        }
+                      } else if (sIdx !== -1) {
+                        coveredIndices.add(sIdx);
+                      } else if (eIdx !== -1) {
+                        // Orphaned end? Ignore or mark
+                        coveredIndices.add(eIdx);
+                      }
+                    });
+
+                    // Find first free index
+                    let startIdx = -1;
+                    for (let i = 0; i < topLevel.length; i++) {
+                      if (!coveredIndices.has(i)) {
+                        startIdx = i;
+                        break;
+                      }
+                    }
+
+                    if (startIdx !== -1) {
+                      // Try to grab the next one too if free
+                      let endIdx = startIdx;
+
+                      // Look ahead for contiguous free slot
+                      if (startIdx + 1 < topLevel.length && !coveredIndices.has(startIdx + 1)) {
+                        endIdx = startIdx + 1;
+                      }
+
+                      onAddNarrativeMarker({
+                        label: `Seção ${(existingMarkers.length || 0) + 1}`,
+                        startSceneId: topLevel[startIdx].id,
+                        endSceneId: topLevel[endIdx].id,
+                        color: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'][existingMarkers.length % 5]
+                      });
+                    } else {
+                      // Fallback if full
+                      if (topLevel.length === 0) {
+                        alert("Adicione cenas à sequência antes de criar marcadores.");
+                      } else {
+                        alert("Todas as cenas já pertencem a um grupo. Adicione mais cenas ou ajuste o alcance dos marcadores existentes para liberar espaço.");
+                      }
+                    }
+                  }}>
+                    <Plus className="w-3.5 h-3.5 mr-2" />
+                    Adicionar Marcador
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onUpdateSequence({ layoutDirection: sequence.layoutDirection === 'horizontal' ? 'vertical' : 'horizontal' })}>
                     {sequence.layoutDirection === 'horizontal' ? (
                       <>
@@ -464,21 +603,152 @@ function SequenceModuleComponent({
         // When collapsed, reduce padding/gap
         sequence.isCollapsed && "p-0 gap-0"
       )}>
-        {(sequence.scenes || []).filter(s => !s.parentId && s.isVisible !== false).map((scene, index) => (
-          <React.Fragment key={scene.id}>
-            {/* Connector between main scenes groups */}
-            {index > 0 && (
-              <div className={cn(
-                "bg-border transition-all duration-500",
-                sequence.layoutDirection === 'horizontal'
-                  ? (sequence.scenesSpacing === 'none' ? "w-0 h-0 opacity-0" : "w-8 h-0.5")
-                  : (sequence.scenesSpacing === 'none' ? "h-0 w-0 opacity-0" : "h-8 w-0.5"),
-                sequence.isCollapsed && "w-0 h-0 opacity-0 m-0"
-              )} />
-            )}
-            {renderSceneWithChildren(scene, true, index)}
-          </React.Fragment>
-        ))}
+        {groupedItems.map((item, index) => {
+          // Determine if we need a connector before this item
+          const needsConnector = index > 0;
+
+          if (item.type === 'scene') {
+            const scene = item.data;
+            return (
+              <React.Fragment key={scene.id}>
+                {needsConnector && (
+                  <div className={cn(
+                    "bg-border transition-all duration-500",
+                    sequence.layoutDirection === 'horizontal'
+                      ? (sequence.scenesSpacing === 'none' ? "w-0 h-0 opacity-0" : "w-8 h-0.5")
+                      : (sequence.scenesSpacing === 'none' ? "h-0 w-0 opacity-0" : "h-8 w-0.5"),
+                    sequence.isCollapsed && "w-0 h-0 opacity-0 m-0"
+                  )} />
+                )}
+                {renderSceneWithChildren(scene, true, index)}
+              </React.Fragment>
+            )
+          } else {
+            // Marker Group
+            const marker = item.data.marker;
+            const scenes = item.data.scenes;
+            return (
+              <React.Fragment key={marker.id}>
+                {needsConnector && (
+                  <div className={cn(
+                    "bg-border transition-all duration-500",
+                    sequence.layoutDirection === 'horizontal'
+                      ? (sequence.scenesSpacing === 'none' ? "w-0 h-0 opacity-0" : "w-8 h-0.5")
+                      : (sequence.scenesSpacing === 'none' ? "h-0 w-0 opacity-0" : "h-8 w-0.5"),
+                    sequence.isCollapsed && "w-0 h-0 opacity-0 m-0"
+                  )} />
+                )}
+                <div className={cn(
+                  "relative border-t transition-all duration-300 flex items-center pt-2 mt-4 px-2 hover:bg-accent/5 rounded-md group/marker",
+                  sequence.layoutDirection === 'horizontal' ? "flex-row" : "flex-col",
+                  sequence.isCollapsed && "hidden"
+                )}
+                  style={{
+                    borderColor: marker.color || 'var(--primary)',
+                    borderTopWidth: '3px'
+                  }}>
+                  {/* Marker Label with Popover */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div
+                        className="absolute -top-4 left-1/2 -translate-x-1/2 bg-background px-3 py-0.5 text-[10px] uppercase font-bold tracking-wider text-muted-foreground border border-border/50 rounded-full cursor-pointer hover:text-foreground no-drag z-20 whitespace-nowrap shadow-sm flex items-center gap-2 hover:scale-105 transition-transform"
+                        style={{ color: marker.color }}
+                      >
+                        {marker.label}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-3 no-drag" onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground">Nome</label>
+                          <div className="flex items-center gap-2">
+                            <Type className="w-3 h-3 text-muted-foreground" />
+                            <input
+                              className="flex-1 bg-transparent border-b border-border text-xs focus:outline-none focus:border-primary py-1"
+                              value={marker.label}
+                              onChange={(e) => onUpdateNarrativeMarker(marker.id, { label: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground">Cor</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#6b7280'].map(color => (
+                              <button
+                                key={color}
+                                className={cn(
+                                  "w-5 h-5 rounded-full border border-border/50 transition-transform hover:scale-110",
+                                  marker.color === color && "ring-2 ring-offset-1 ring-primary"
+                                )}
+                                style={{ backgroundColor: color }}
+                                onClick={() => onUpdateNarrativeMarker(marker.id, { color })}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground">Alcance</label>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground w-8">Início</span>
+                              <div className="flex items-center gap-1">
+                                <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateMarkerRange(marker.id, 'start', 'backward')}>
+                                  <ChevronLeft className="w-3 h-3" />
+                                </Button>
+                                <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateMarkerRange(marker.id, 'start', 'forward')}>
+                                  <ChevronRight className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground w-8">Fim</span>
+                              <div className="flex items-center gap-1">
+                                <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateMarkerRange(marker.id, 'end', 'backward')}>
+                                  <ChevronLeft className="w-3 h-3" />
+                                </Button>
+                                <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateMarkerRange(marker.id, 'end', 'forward')}>
+                                  <ChevronRight className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-destructive hover:text-destructive h-7 text-xs justify-start px-0"
+                          onClick={() => onDeleteNarrativeMarker(marker.id)}
+                        >
+                          <X className="w-3 h-3 mr-2" />
+                          Remover Marcador
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {scenes.map((s: any, idx: number) => (
+                    <React.Fragment key={s.id}>
+                      {idx > 0 && (
+                        <div className={cn(
+                          "bg-border transition-all duration-500",
+                          sequence.layoutDirection === 'horizontal'
+                            ? (sequence.scenesSpacing === 'none' ? "w-0 h-0 opacity-0" : "w-8 h-0.5")
+                            : (sequence.scenesSpacing === 'none' ? "h-0 w-0 opacity-0" : "h-8 w-0.5"),
+                        )} />
+                      )}
+                      {renderSceneWithChildren(s, true, index + idx)}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </React.Fragment>
+            )
+          }
+        })}
 
         {/* Connector to Add Button (Hidden when collapsed) */}
         <div className={cn(

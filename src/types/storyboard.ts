@@ -26,11 +26,20 @@ export interface SceneModule {
   isVisible?: boolean;
 }
 
+export interface NarrativeMarker {
+  id: string;
+  label: string;
+  startSceneId: string;
+  endSceneId: string;
+  color?: string; // Optional accent color
+}
+
 export interface SequenceModule {
   id: string;
   title: string;
   storyContext: string;
   scenes: SceneModule[];
+  narrativeMarkers: NarrativeMarker[]; // New field
   position: Position;
   isCollapsed: boolean;
   aspectRatio: AspectRatio;

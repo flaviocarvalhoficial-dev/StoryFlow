@@ -24,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export function StoryboardApp() {
   const [isDark, setIsDark] = useState(() => {
@@ -33,6 +34,19 @@ export function StoryboardApp() {
     }
     return false;
   });
+
+  const { profile, updateProfile } = useUserProfile();
+
+  // Backwards compatibility / Default profile
+  const userProfile: UserProfile = profile || {
+    firstName: 'Flavio',
+    lastName: 'Carvalho',
+    email: 'flaviocarvalhoficial@gmail.com',
+    specialty: 'Filmmaker',
+    plan: 'Pro',
+    avatarUrl: ''
+  };
+
   const [currentView, setCurrentView] = useState<'canvas' | 'prompts' | 'projects' | 'moodboard'>(() => {
     const saved = localStorage.getItem('storyflow_projects');
     if (!saved || JSON.parse(saved).length === 0) return 'projects';
@@ -40,17 +54,6 @@ export function StoryboardApp() {
   });
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('storyflow_user_profile');
-    return saved ? JSON.parse(saved) : {
-      firstName: 'Flavio',
-      lastName: 'Carvalho',
-      email: 'flaviocarvalhoficial@gmail.com',
-      specialty: 'Filmmaker',
-      plan: 'Pro',
-      avatarUrl: ''
-    };
-  });
 
   // Interface Settings State
   const [sidebarFontSize, setSidebarFontSize] = useState<'01' | '02' | '03'>(() => {
@@ -74,9 +77,7 @@ export function StoryboardApp() {
     localStorage.setItem('storyflow_sidebar_font_size', sidebarFontSize);
   }, [sidebarFontSize]);
 
-  useEffect(() => {
-    localStorage.setItem('storyflow_user_profile', JSON.stringify(userProfile));
-  }, [userProfile]);
+  // userProfile persistence is now handled by useUserProfile hook (Supabase)
 
   useEffect(() => {
     localStorage.setItem('storyflow_grid_style', gridStyle);
@@ -143,7 +144,11 @@ export function StoryboardApp() {
     addMoodBoardItem,
     updateMoodBoardItem,
     deleteMoodBoardItem,
-    updatePromptCategory
+    updatePromptCategory,
+    // Narrative Markers
+    addNarrativeMarker,
+    updateNarrativeMarker,
+    deleteNarrativeMarker
   } = useProject();
 
   useEffect(() => {
@@ -342,6 +347,9 @@ export function StoryboardApp() {
               connectionStyle={connectionStyle}
               defaultRatio={defaultRatio}
               sceneBorderStyle="solid"
+              onAddNarrativeMarker={addNarrativeMarker}
+              onUpdateNarrativeMarker={updateNarrativeMarker}
+              onDeleteNarrativeMarker={deleteNarrativeMarker}
             />
             <ScriptSidebar
               project={currentProject}
@@ -522,7 +530,7 @@ export function StoryboardApp() {
       <UserProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
-        onUpdateProfile={setUserProfile}
+        onUpdateProfile={updateProfile}
         currentProfile={userProfile}
       />
     </div>
